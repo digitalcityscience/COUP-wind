@@ -35,7 +35,7 @@ input parameters and is requested.
 2. ```docker-compose up -d```
 
 
-## Usage
+## Usage [DEPRECATED]
 ### Create a GroupTask
 Request:
 ```bash
