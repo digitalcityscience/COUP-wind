@@ -10,26 +10,24 @@ cache = Cache()
 
 @app.task()
 def compute_ait_uuid(uuid: str) -> dict:
-    # Check cache. If cached, return result from cache.
-
-    # key = complex_task['hash']
-    # result = cache.retrieve(key=key)
-    # if not result == {}:
-    #     return result
-
     # Start computing
-    # duration = randint(3, 10)
-    # logger.info('Compute {0}'.format(key))
-    # time.sleep(duration)
-    result = uuid
     import time, random
     time.sleep(random.randint(5, 10))
     print("Subtask %s processed" % uuid)
     return {"subtask_result": "Ergebnis von %s" % uuid}
 
 
+# class ComputeWindRequestParams:
+#     def __init__(self, wind_speed: int, wind_direction: int, hash: str):
+#
+
 @app.task()
-def compute_wind_request(wind_speed: int, wind_direction: int):
+def compute_wind_request(wind_speed: int, wind_direction: int, hash: str):
+    # Check cache. If cached, return result from cache.
+    key = hash
+    result = cache.retrieve(key=key)
+    if not result == {}:
+        return result
     import uuid
     import time
 
@@ -41,7 +39,6 @@ def compute_wind_request(wind_speed: int, wind_direction: int):
     task_group = group([compute_ait_uuid.s(uuid) for uuid in uuids])
     group_result = task_group()
     group_result.save()
-    # print("Vinh guck mal hier:", type(group_result))
     return group_result.id
 
 
@@ -52,6 +49,6 @@ def task_postrun_handler(task_id, task, *args, **kwargs):
     result = kwargs.get('retval')
 
     # Cache only succeeded tasks
-    # if state == "SUCCESS":
-    #     key = args[0]['hash']
-    #     cache.save(key=key, value=result)
+    if state == "SUCCESS" and task.name == 'tasks.compute_wind_request':
+        key = args[2]  # Params of compute_ait_uuid() function
+        cache.save(key=key, value=result)

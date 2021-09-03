@@ -37,9 +37,10 @@ def process_windgrouptask():
         single_task = {
             "wind_speed": request.json['wind_speed'],
             "wind_direction": request.json['wind_direction'],
+            "hash": request.json['hash']
         }
 
-        single_result = tasks.compute_wind_request.delay(single_task['wind_speed'], single_task['wind_direction'])
+        single_result = tasks.compute_wind_request.delay(single_task['wind_speed'], single_task['wind_direction'], single_task['hash'])
         response = {'taskId': single_result.id}
 
         # return jsonify(response), HTTPStatus.OK
