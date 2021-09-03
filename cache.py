@@ -1,8 +1,7 @@
 import json
 
-import redis
-
 import config
+import redis
 
 
 class Cache:

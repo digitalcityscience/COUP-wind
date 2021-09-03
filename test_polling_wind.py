@@ -19,7 +19,6 @@ grouptask_id = None
 print("Listen for task-result. Result is the id of the GroupTask.")
 while not task_succeeded:
     response = requests.get('http://localhost:5000/tasks/{}'.format(task_id))
-    # pprint(response)
     task_succeeded = response.json()['taskSucceeded']
     time.sleep(1)
 
@@ -30,7 +29,6 @@ print("Got id from GroupTasks (%s). Now start polling for Zwischenergebnisse" % 
 results_completed = False
 while not results_completed:
     response = requests.get('http://localhost:5000/grouptasks/{}'.format(grouptask_id)).json()
-    # pprint(response)
     results_completed = response['grouptaskProcessed']
     pprint(response)
     time.sleep(1)
