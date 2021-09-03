@@ -3,7 +3,6 @@ from http import HTTPStatus
 from celery.result import AsyncResult, GroupResult
 from flask import Flask, request, abort, make_response, jsonify
 
-import services
 import tasks
 from mycelery import app as celery_app
 
@@ -24,28 +23,6 @@ def bad_request(message: str):
         jsonify({'error': message}),
         400
     )
-
-
-@app.route("/grouptasks", methods=['POST'])
-def process_grouptask():
-    # Validate request
-    if not request.json and not 'tasks' in request.json:
-        abort(400)
-
-    # Parse requests
-    try:
-        complex_tasks = request.json['tasks']
-        group_result = services.compute(complex_tasks=complex_tasks)
-        result_ids = [result.id for result in group_result.results]
-        response = {'grouptaskId': group_result.id, 'taskIds': result_ids}
-
-        # return jsonify(response), HTTPStatus.OK
-        return make_response(
-            jsonify(response),
-            HTTPStatus.OK,
-        )
-    except KeyError:
-        return bad_request("Payload not correctly structured.")
 
 
 @app.route("/windtask", methods=['POST'])
