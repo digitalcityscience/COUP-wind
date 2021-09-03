@@ -59,6 +59,10 @@ def perform_swmm_analysis(user_input) -> dict:
     return get_result_geojson()
 
 
+def perform_wind_stuff(complex_task:dict) -> int:
+    return x + y
+
+
 # sends the response to cityPyo, creating a new file as myHash.json
 def send_response_to_cityPyo(scenario_hash):
     print("\n sending to cityPyo")

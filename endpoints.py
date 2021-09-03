@@ -4,6 +4,7 @@ from celery.result import AsyncResult, GroupResult
 from flask import Flask, request, abort, make_response, jsonify
 
 import services
+import tasks
 from mycelery import app as celery_app
 
 app = Flask(__name__)
@@ -37,6 +38,32 @@ def process_grouptask():
         group_result = services.compute(complex_tasks=complex_tasks)
         result_ids = [result.id for result in group_result.results]
         response = {'grouptaskId': group_result.id, 'taskIds': result_ids}
+
+        # return jsonify(response), HTTPStatus.OK
+        return make_response(
+            jsonify(response),
+            HTTPStatus.OK,
+        )
+    except KeyError:
+        return bad_request("Payload not correctly structured.")
+
+
+@app.route("/windtask", methods=['POST'])
+def process_windgrouptask():
+    # Validate request
+    if not request.json and not 'tasks' in request.json:
+        abort(400)
+
+    # Parse requests
+    try:
+        print("Wind_request ist angekommen.")
+        single_task = {
+            "wind_speed": request.json['wind_speed'],
+            "wind_direction": request.json['wind_direction'],
+        }
+
+        single_result = tasks.compute_wind_request.delay(single_task['wind_speed'], single_task['wind_direction'])
+        response = {'taskId': single_result.id}
 
         # return jsonify(response), HTTPStatus.OK
         return make_response(
@@ -81,6 +108,7 @@ def get_task(task_id: str):
         'resultReady': async_result.ready(),
     }
     if async_result.ready():
+        print(type(async_result.get()))
         response['result'] = async_result.get()
 
     return make_response(

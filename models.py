@@ -14,3 +14,4 @@ class ComplexTask:
 class ComplexTaskBatch:
     def __init__(self, tasks: list):
         self.tasks = tasks
+
