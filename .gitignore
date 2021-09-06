@@ -15,6 +15,18 @@ Icon
 # Thumbnails
 ._*
 
+#tmp files for calculation
+tmp_tiff/
+
+#local files
+infrared.json
+cityPyo.json
+graph_output.json
+sample_request.sh
+test_polling_wind.py
+
+
+
 # Files that might appear in the root of a volume
 .DocumentRevisions-V100
 .fseventsd

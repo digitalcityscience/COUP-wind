@@ -1,4 +1,5 @@
 from http import HTTPStatus
+from wind.wind_scenario_params import WindScenarioParams
 
 from celery.result import AsyncResult, GroupResult
 from flask import Flask, request, abort, make_response, jsonify
@@ -34,15 +35,8 @@ def process_windgrouptask():
     # Parse requests
     try:
         print("Wind_request ist angekommen.")
-        single_task = {
-            "wind_speed": request.json['wind_speed'],
-            "wind_direction": request.json['wind_direction'],
-            "hash": request.json['hash']
-        }
-
-        single_result = tasks.compute_wind_request.delay(single_task['wind_speed'],
-                                                         single_task['wind_direction'],
-                                                         single_task['hash'])
+        
+        single_result = tasks.compute_wind_request.delay(request.json)
         response = {'taskId': single_result.id}
 
         # return jsonify(response), HTTPStatus.OK

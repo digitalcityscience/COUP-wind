@@ -1,0 +1,14 @@
+requests
+matplotlib
+schedule
+asyncio
+geopandas
+pyproj
+rasterio
+shapely
+icecream
+numpy
+rioxarray
+pygeos
+flask
+flask_cors
