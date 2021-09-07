@@ -1,3 +1,4 @@
+from requests.api import request
 from wind.wind_scenario_params import WindScenarioParams
 from wind.main import collect_and_format_result_from_ait, start_calculation
 from celery import signals, group
@@ -13,32 +14,10 @@ cache = Cache()
 
 
 @app.task()
-def collect_result(uuid: str, result_format) -> dict:
-    # Start computing
-    result = collect_and_format_result_from_ait(
-        uuid,
-        result_format
-    )
+def collect_infrared_result(uuid: str, result_format) -> dict:
+    # collect the result from AIT endpoint and format it
+    return collect_and_format_result_from_ait(uuid, result_format)
 
-    return {"subtask_result": result}
-
-
-@app.task()
-def compute_ait_uuid(project: str) -> dict:
-    # Start computing
-    import time, random
-    time.sleep(random.randint(5, 10))
-
-    import uuid
-    uuid = uuid.uuid4()
-
-    print("Subtask %s processed" % uuid)
-    return {"subtask_result": "Ergebnis von %s" % uuid}
-
-
-# class ComputeWindRequestParams:
-#     def __init__(self, wind_speed: int, wind_direction: int, hash: str):
-#
 
 @app.task()
 def compute_wind_request(request_json: dict):
@@ -50,25 +29,12 @@ def compute_wind_request(request_json: dict):
     if not result == {}:
         return result
     
-    import uuid
-    import time
-
-
-
-    print("Computation incoming for wind_speed: %s, wind_direction: %s, and city_pyo_user : %s" % (
-        wind_scenario.wind_speed, 
-        wind_scenario.wind_direction,
-        wind_scenario.city_pyo_user
-    ))
-
-    print("Trigger calculation at AIT endpoint")
-    uuids = start_calculation(wind_scenario)
-    print("uuids from AIT ", uuids)
-
-
-    print("Start processing subtasks given by AIT")
-    task_group = group([compute_ait_uuid.s(uuid) for uuid in uuids])
-    #task_group = group([collect_result.s(uuid, wind_scenario.result_format) for uuid in uuids])
+    # Trigger calculation at AIT Infrared endpoint
+    infrared_projects = start_calculation(wind_scenario, "wind")
+    
+    # collect result for each of the infrared projects
+    result_format = wind_scenario.result_format
+    task_group = group([collect_infrared_result.s(project, result_format) for project in infrared_projects])
     group_result = task_group()
     group_result.save()
     
@@ -81,7 +47,12 @@ def task_postrun_handler(task_id, task, *args, **kwargs):
     args = kwargs.get('args')
     result = kwargs.get('retval')
 
-    # Cache only succeeded tasks
-    if state == "SUCCESS" and type(args[0]) == WindScenarioParams:
-        key = args[0].hash  # Params of compute_ait_uuid() function
-        cache.save(key=key, value=result)
+    if state == "SUCCESS":
+        try:
+            # if you can create WindScenarioParams from the request - then cache the result
+            params = WindScenarioParams(args[0])
+            cache.save(key=params.hash, value=result)
+        
+        except:
+            # do not cache
+            pass

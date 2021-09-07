@@ -9,7 +9,7 @@ class WindScenarioParams:
         self.result_format = request_json["result_format"]
         
         try:
-            self.city_pyo_user = request_json["city_pyo_user"]
+            self.city_pyo_user_id = request_json["city_pyo_user"]
         except:
             self.set_default_city_pyo_user()
 
@@ -19,10 +19,8 @@ class WindScenarioParams:
             
     def set_default_city_pyo_user(self):
         import wind.cityPyo
-
         cityPyo = CityPyo()
-
-        self.city_pyo_user = cityPyo.cityPyo_user_ids[0]
+        self.city_pyo_user_id = cityPyo.cityPyo_user_ids[0]
 
 
     

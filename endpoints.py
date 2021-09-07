@@ -27,15 +27,13 @@ def bad_request(message: str):
 
 
 @app.route("/windtask", methods=['POST'])
-def process_windgrouptask():
+def process_windtask():
     # Validate request
     if not request.json and not 'tasks' in request.json:
         abort(400)
 
     # Parse requests
     try:
-        print("Wind_request ist angekommen.")
-        
         single_result = tasks.compute_wind_request.delay(request.json)
         response = {'taskId': single_result.id}
 

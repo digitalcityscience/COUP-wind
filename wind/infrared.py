@@ -31,15 +31,16 @@ def get_from_config(key):
 class InfraredUser:
     """Class to handle Infrared communication for the InfraredUser"""
 
-    def __init__(self, reset_user_at_endpoint=False):
+    def __init__(self, reset_user_at_endpoint=False, uuid=None, token=None):
 
         ic("init new infrared user")
 
-        self.uuid = ''
-        self.token = ''
+        self.uuid = uuid
+        self.token = token
         self.infrared_projects = {}  # {"cityPyoUserId": [InfraredProjects], "cityPyoUserId_2": [InfraredProjects]}
 
-        self.infrared_user_login()
+        if not self.uuid:
+            self.infrared_user_login()
 
         if reset_user_at_endpoint:
             self.delete_all_projects()
@@ -113,6 +114,7 @@ class InfraredProject:
             bbox_buffer,
             snapshot_uuid=None,
             project_uuid=None,
+            result_type=None
     ):
 
         # set properties
@@ -121,6 +123,7 @@ class InfraredProject:
         self.api_url = get_from_config("api_url")
         self.project_uuid = project_uuid
         self.snapshot_uuid = snapshot_uuid
+        self.result_type = result_type
 
         # set bbox properties
 
@@ -128,6 +131,7 @@ class InfraredProject:
         self.bbox_utm  = bbox_utm
         self.bbbox_wgs = transform(transformer_to_wgs, bbox_utm)
 
+        self.bbox_buffer = bbox_buffer
         self.buffered_bbox_utm = bbox_utm.buffer(bbox_buffer, cap_style=3).exterior.envelope
         self.buffered_bbox_wgs = transform(transformer_to_wgs, self.buffered_bbox_utm)
 
@@ -351,8 +355,6 @@ class InfraredProject:
             raise NotImplementedError
 
     def set_result_for(self, result_type, result):
-
-
         if not result:
             result = {"analysisOutputData": []}
 
@@ -432,19 +434,20 @@ class InfraredProject:
             print("calculation for ", result_type, " FAILS")
             print(exception)
 
-    async def download_result_and_crop_to_roi(self, result_type) -> {}:
-        result_uuid = self.get_result_uuid_for(result_type)
+    # waits for the result to be avaible. Then crops it to the area of interest.
+    def download_result_and_crop_to_roi(self, result_type, result_uuid=None) -> dict:
+        if not result_uuid:
+            result_uuid = self.get_result_uuid_for(result_type)
 
         tries = 0
         max_tries = 100
         response = make_query(wind.queries.get_analysis_output_query(result_uuid, self.snapshot_uuid), self.user.token)
 
+        # wait for result to arrive
         while (not get_value(response, ["data", "getAnalysisOutput", "infraredSchema"])) and tries <= max_tries:
-            ic(response, result_uuid)
-            #time.sleep(0.5)  # todo asyncio sleep?
-            await asyncio.sleep(0.5)
             tries += 1
             response = make_query(wind.queries.get_analysis_output_query(result_uuid, self.snapshot_uuid), self.user.token)
+            time.sleep(2)  # give the API some time to calc something
 
         if not tries > max_tries:
             result = get_value(
@@ -453,16 +456,12 @@ class InfraredProject:
                            result_uuid]
             )
 
-            print(result)
-
             # update result, after cropping to roi
             self.crop_result_data_to_roi(result, result_type)
             self.set_result_for(result_type, result)
-
         else:
             self.set_result_for(result_type, None)
 
-        return self.get_result_for(result_type)
 
     # private
     def crop_result_data_to_roi(self, result, result_type):

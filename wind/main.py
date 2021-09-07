@@ -1,21 +1,17 @@
 import os
 import time
-import asyncio
 import schedule
-import base64
-from icecream import ic
+
 from shapely.ops import transform
-from shapely.geometry import Point
+from shapely.geometry import Point, Polygon
 
 from wind.cityPyo import CityPyo
 from wind.wind_scenario_params import WindScenarioParams
-
-
 from wind.data import get_buildings_for_bbox, \
     get_project_area_polygons, convert_tif_to_geojson_features, get_project_area_as_gdf, make_gdf_from_coordinates, \
     make_gdf_from_geojson, get_south_west_corner_coords_of_bbox, transformer_to_wgs, transformer_to_utm, init_bbox_matrix_for_project_area
 from wind.infrared import InfraredProject, InfraredUser
-
+from wind.format_result import format_result
 
 
 # todo get resolution and bbox_buffer from config
@@ -25,8 +21,7 @@ bbox_buffer = (max_bbox_size - bbox_size) / 2
 analysis_resolution = 10  # resolution of analysis in meters
 
 cityPyo = CityPyo()   # TODO externalize collection of buildings!
-bbox_matrix = init_bbox_matrix_for_project_area(bbox_size)
-infrared_projects_for_user = {}
+bbox_matrix = init_bbox_matrix_for_project_area(bbox_size)  # subdivide the project area into bboxes
 
 
 # TODO externalize
@@ -64,93 +59,11 @@ def update_buildings_for_infrared_project(infrared_project: InfraredProject, cit
     infrared_project.update_buildings(buildings_in_bbox)
 
 
-# TODO move to format_result.py
-def format_result(infrared_project: InfraredProject, result_type: str,  out_format: str):
-    result = infrared_project.get_result_for(result_type)
-
-    if not result["analysisOutputData"]:
-        # empty result (e.g. not in ROI) -> return empty list of features
-        return []
-
-    if out_format == "geojson":
-        features = convert_tif_to_geojson_features(infrared_project.get_result_geotif_for(result_type))
-        return features
-
-    if out_format == 'geotiff':
-        bounds_polygon = infrared_project.get_bounds_of_geotif_bounds(result_type, "wgs")
-        bounds_coordinates = list(bounds_polygon.exterior.coords)
-
-        with open(infrared_project.get_result_geotif_for(result_type), "rb") as image_file:
-            base64_bytes = base64.b64encode(image_file.read())
-            base64_string = base64_bytes.decode('utf-8')
-
-        return [{
-            "bbox_id": infrared_project.name,
-            "bbox_sw_corner": get_south_west_corner_coords_of_bbox(bounds_polygon),
-            "bbox_coordinates": bounds_coordinates,
-            "image_base64_string": base64_string
-        }]
-
-    if out_format == "raw":
-        bounds_polygon =  infrared_project.get_bounds_of_geotif_bounds(result_type, "wgs")
-        bounds_coordinates = list(bounds_polygon.exterior.coords)
-
-        return [{
-            "bbox_id": infrared_project.name,
-            "bbox_sw_corner": get_south_west_corner_coords_of_bbox(bounds_polygon),
-            "bbox_coordinates": bounds_coordinates,
-            "values": result["analysisOutputData"]
-        }]
-
-    if out_format == "png":
-        bounds_polygon = infrared_project.get_bounds_of_geotif_bounds(result_type, "wgs")
-        bounds_coordinates = list(bounds_polygon.exterior.coords)
-
-        import numpy as np
-        import math
-        from io import BytesIO
-        from PIL import Image
-
-        image_data = result["analysisOutputData"]
-
-        # convert image data to ints from 0-255 (for png)
-        # set NaN as 0
-        image_data = [
-            [int(round(x * 255)) if not math.isnan(x) else 0 for x in image_line]
-            for image_line in image_data
-        ]
-        # create a np array from image data
-        np_values = np.array(image_data, dtype="uint8")
-
-        # create a pillow image, save it and convert to base64 string
-        im = Image.fromarray(np_values)
-        output_buffer = BytesIO()
-        im.save(output_buffer, format='PNG')
-        byte_data = output_buffer.getvalue()
-        base64_bytes = base64.b64encode(byte_data)
-        base64_string = base64_bytes.decode('utf-8')
-
-        img_width, img_height = im.size
-
-        return [{
-            "bbox_id": infrared_project.name,
-            "bbox_sw_corner": get_south_west_corner_coords_of_bbox(bounds_polygon),
-            "img_width": img_width,
-            "img_height": img_height,
-            "bbox_coordinates": bounds_coordinates,
-            "image_base64_string": base64_string
-        }]
-
-    else:
-        print("unknown format requested: ", out_format)
-        raise NotImplementedError
-
   # get the infrared projects for this city_pyo_user
-def find_existing_infrared_projects_for_city_pyo_user(infrared_user, city_pyo_user):
-    ic("getting all projects from endpoint")
-    all_city_science_projects_at_endpoint = infrared_user.get_all_projects()
+def find_existing_projects_at_infrared_endpoint(infrared_user, city_pyo_user):
+    all_projects_at_endpoint = infrared_user.get_all_projects()
 
-    if not all_city_science_projects_at_endpoint:
+    if not all_projects_at_endpoint:
         return []
 
     # create array with {} of buffered boxes and their sw corners
@@ -162,9 +75,9 @@ def find_existing_infrared_projects_for_city_pyo_user(infrared_user, city_pyo_us
             "s_w_corner": Point(get_south_west_corner_coords_of_bbox(buffered_bbox))
         })
 
-    # match projects existing at AIT with bboxes in order to recreate projects locally
+    # filter all projects at the endpoint for projects belonging to this city_pyo_user
     city_pyo_user_projects = []
-    for project_uuid, project in all_city_science_projects_at_endpoint.items():
+    for project_uuid, project in all_projects_at_endpoint.items():
         if city_pyo_user in project["projectName"]:
             project["project_uuid"] = project_uuid
             project["snapshot_uuid"] = infrared_user.get_root_snapshot_id_for_project_uuid(project_uuid)
@@ -185,82 +98,104 @@ def find_existing_infrared_projects_for_city_pyo_user(infrared_user, city_pyo_us
 
 def create_local_project_instances(infrared_user: InfraredUser, city_pyo_user: str, existing_projects: list):
     # recreate local InfraredProject instances of projects already established at endpoint
+    infrared_projects_for_user = []
     for project in existing_projects:
-        infrared_projects_for_user[project["project_uuid"]] = InfraredProject(
+        infrared_projects_for_user.append(InfraredProject(
             infrared_user, project["projectName"], project["bbox"], analysis_resolution, bbox_buffer, project["snapshot_uuid"], project["project_uuid"]
             )
+        )
     
-    # if the AIT endpoints does not have a project for each bbox - create new projects locally and at endpoint.
-    bboxes_matched_to_existing_bboxes = [project["bbox"] for project in existing_projects]
-
-    if not len(bboxes_matched_to_existing_bboxes) == len(bbox_matrix):
-        # create a new project for each bbox
+    # if there are not projects at the Infrared endpoint - create one for each bbox.
+    if not existing_projects:
         for index, bbox in enumerate(bbox_matrix):
-            if bbox not in bboxes_matched_to_existing_bboxes:
-                project = {
-                    "projectName": city_pyo_user + "_" + str(index),
-                    "bbox": bbox,
-                }
-                # create missing projects at AIT endpoint
-                infrared_project = InfraredProject(infrared_user, project["projectName"], project["bbox"], analysis_resolution, bbox_buffer)
-                infrared_projects_for_user[infrared_project.project_uuid] = infrared_project
+            project = {
+                "projectName": city_pyo_user + "_" + str(index),
+                "bbox": bbox,
+            }
+            # create missing projects at AIT endpoint
+            infrared_project = InfraredProject(infrared_user, project["projectName"], project["bbox"], analysis_resolution, bbox_buffer)
+            infrared_projects_for_user.append(infrared_project)    
 
+    
     return infrared_projects_for_user
 
 
-# TODO single task: start calculation: then group task to collect results individually.
-def start_calculation(scenario: WindScenarioParams, result_type="wind"):
+def infrared_project_to_json(infrared_project: InfraredProject, result_type: str):
+    return {
+        "name": infrared_project.name,
+        "bbox_coords": list(infrared_project.bbox_utm.exterior.coords),
+        "resolution": infrared_project.analysis_grid_resolution,
+        "buffer": infrared_project.bbox_buffer,
+        "snapshot_uuid": infrared_project.snapshot_uuid,
+        "project_uuid": infrared_project.project_uuid,
+        "snapshot_uuid": infrared_project.snapshot_uuid,
+        "result_type": result_type,
+        "result_uuid": infrared_project.get_result_uuid_for(result_type),
+        "infrared_client": {
+            "uuid": infrared_project.user.uuid,
+            "token": infrared_project.user.token,
+        }
+    }
+
+# prepares data and requests a calculation at Infrared endpointt
+def start_calculation(scenario: WindScenarioParams, result_type):
+    
     # init InfraredUser class to handle communication with AIT api
     infrared_user = InfraredUser()
     
-    city_pyo_user = scenario.city_pyo_user
+    city_pyo_user_id = scenario.city_pyo_user_id
     
     # get infrared projects for cityPyoUser from AIT endpoint
-    existing_projects_at_AIT = find_existing_infrared_projects_for_city_pyo_user(infrared_user, city_pyo_user)
-    infrared_projects = create_local_project_instances(infrared_user, city_pyo_user, existing_projects_at_AIT)
-
-    print("infrared_projects in wind worker")
-    print(infrared_projects)
+    existing_projects_at_AIT = find_existing_projects_at_infrared_endpoint(infrared_user, city_pyo_user_id)
+    infrared_projects = create_local_project_instances(infrared_user, city_pyo_user_id, existing_projects_at_AIT)
 
     # update buildings in all projects, if buildings have changed
     # todo find out if buildings were updated via redis database, update buildings at endpoint if necessary.
 
-    # todo refactor result roi later
+    # todo refactor result roi later , currently not working
     # result_roi = get_result_roi(scenario)  # geodataframe with the Area of Interest for the result
 
-    for _uuid, infrared_project in infrared_projects.items():
+    for infrared_project in infrared_projects:
         # prepare inputs
         update_calculation_settings_for_infrared_project(scenario, infrared_project)
+        # TODO update_buildings_for_infrared_project(infrared_project)
 
         # calculate results
         if not infrared_project.get_result_uuid_for(result_type):
-            ic("triggering calculation for ", infrared_project.name)
             # triggers new wind calculation for project on endpoint. Results are collected later.
             infrared_project.trigger_calculation_at_endpoint_for(result_type)
     
-    return list(infrared_projects.keys())
+    
+    # return serializable info, so that the InfraredProjects can be recreated for result collection in another thread.
+    return [infrared_project_to_json(project, result_type) for project in infrared_projects]
   
 
 # collects result of 1 infrared project from AIT api, returns it after formatting
-# TODO do this as a task in a group task. mark result as complete when group task finished. 
-# TODO combine all project results using celery.cache! 
-async def collect_and_format_result_from_ait(infrared_project_uuid: str, result_format: str, result_type="wind"):
-    infrared_project = infrared_projects_for_user[infrared_project_uuid]
+def collect_and_format_result_from_ait(infrared_project_json: dict, result_format: str, result_type="wind"):
     
-    print("these are the infrared proejcts saved for the user")
-    print(infrared_projects_for_user)
+    # locally recreate InfraredUser, to handle communication with the Infrared endpoint
+    infrared_user = InfraredUser(
+        reset_user_at_endpoint=False,
+        uuid = infrared_project_json["infrared_client"]["uuid"],
+        token = infrared_project_json["infrared_client"]["token"]
+    )
 
-    print("*****")
+    # locally recreate infrared project, in order to use result formatting logic
+    infrared_project = InfraredProject(
+            infrared_user, 
+            infrared_project_json["name"], 
+            Polygon(infrared_project_json["bbox_coords"]),
+            infrared_project_json["resolution"],
+            infrared_project_json["buffer"],
+            infrared_project_json["snapshot_uuid"],
+            infrared_project_json["project_uuid"],
+            infrared_project_json["result_type"],
+            )
     
-    print("collecting fresult for", infrared_project_uuid)
-    print("awaiting result here!!!")
-    print(infrared_project)
+    # download result
+    infrared_project.download_result_and_crop_to_roi(result_type, infrared_project_json["result_uuid"])
 
-    # async await remaining result
-    if not infrared_project.get_result_uuid_for(result_type):
-        await infrared_project.download_result_and_crop_to_roi(result_type)
-
-    # format and return result
+    # formats result (as png, geojson, ...) before returning it
     return format_result(infrared_project, result_type, result_format)
 
 

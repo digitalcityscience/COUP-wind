@@ -7,7 +7,7 @@ headers = {
     'Content-type': 'application/json',
 }
 
-data = '{ "city_pyo_user": "", "wind_speed": 25, "wind_direction": 270, "result_format": "geojson", "custom_roi": [], "hash": "werwererererwer" }'
+data = '{ "city_pyo_user": "", "wind_speed": 25, "wind_direction": 270, "result_format": "geojson", "custom_roi": [], "hash": "test" }'
 
 response = requests.post('http://localhost:5000/windtask', headers=headers, data=data)
 
@@ -31,7 +31,8 @@ results_completed = False
 while not results_completed:
     response = requests.get('http://localhost:5000/grouptasks/{}'.format(grouptask_id)).json()
     results_completed = response['grouptaskProcessed']
-    pprint(response)
+    pprint("tasks completed: %s" % response["tasksCompleted"])
+    #pprint("result preview %s" % response["results"][0][0])
     time.sleep(1)
 
 print("Fertig!")

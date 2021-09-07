@@ -65,7 +65,7 @@ def get_client_uuid_and_project_uuid_for_snapshot(snapshot_uuid):
 
 
 def new_analysis_output_response(client_uuid, project_uuid, snapshot_uuid, result_uuid):
-    with open('mock_api_output.json') as fp:
+    with open('wind/mock_api_output.json') as fp:
         mock_api_output = json.load(fp)
 
     return {"data": {
@@ -203,10 +203,8 @@ def query():
 
             return new_analysis_output_response(client_uuid, project_uuid, snapshot_uuid, result_uuid)
 
-
-    print("not implemented")
-    print(query)
-    exit()
+    
+    raise NotImplementedError(query)
 
 @app.route('/login', methods=['POST'])
 def login():
