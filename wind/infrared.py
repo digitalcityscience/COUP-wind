@@ -525,7 +525,7 @@ def make_query(query, token_cookie):
     # AIT requested a sleep between the requests. To let their servers breath a bit.
     time.sleep(0.5)
 
-    request = requests.post(get_from_config("api_url"), json={'query': query}, headers={'Cookie': token_cookie})
+    request = requests.post(get_from_config("api_url"), json={'query': query}, headers={'Cookie': token_cookie, 'origin': 'http://infrared.city'})
     if request.status_code == 200:
         return request.json()
     else:
