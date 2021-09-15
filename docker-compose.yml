@@ -13,12 +13,20 @@ services:
     build:
       context: .
     ports:
-      - 5000:5000
+      - 5004:5000
     restart: "always"
     environment:
       - REDIS_HOST=redis
       - REDIS_PORT=6379
-      - REDIS_PASS=G0rDkQtRcl!E
+      - REDIS_PASS=G0rDkQtRcl!E  
+      
+  ait-mock-api:
+    build:
+      context: .
+    ports:
+      - 5555:5555
+    restart: "always"
+    command: python wind/mock_ait_api.py
 
   worker:
     build:
