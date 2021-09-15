@@ -119,6 +119,11 @@ def get_Useruuid_from_query(query):
     import re
     result = re.search('userUuid: (.*)', query)
     return str(result.group(1)).replace('"', '')
+    
+def get_project_name_from_query(query):
+    import re
+    result = re.search('name: (.*)', query)
+    return str(result.group(1)).replace('"', '')
 
 
 def get_uuid_from_query(query):
@@ -139,10 +144,13 @@ def query():
     if "mutation" in query:
         if "createNewProject" in query:
 
+            print(query)
+
             # get client and create project for client
             client_uuid = get_Useruuid_from_query(query)
             project_uuid_id = get_random_uuid_id()
-            clients[client_uuid]["projects"][project_uuid_id] = {}
+            project_name = get_project_name_from_query(query)
+            clients[client_uuid]["projects"][project_uuid_id] = {"projectName": project_name}
 
             return new_project_response(project_uuid_id)
 
