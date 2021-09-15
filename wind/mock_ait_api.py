@@ -127,7 +127,7 @@ def get_uuid_from_query(query):
     return str(result.group(1)).replace('"', '')
 
 
-@app.route('/', methods=['POST'])
+@app.route('/api', methods=['POST'])
 def query():
     params = parseReq(request)
     
@@ -206,7 +206,7 @@ def query():
     
     raise NotImplementedError(query)
 
-@app.route('/login', methods=['POST'])
+@app.route('/', methods=['POST'])
 def login():
     params = parseReq(request)
     if not params:
