@@ -49,6 +49,17 @@ def process_windtask():
 @app.route("/grouptasks/<grouptask_id>", methods=['GET'])
 def get_grouptask(grouptask_id: str):
     group_result = GroupResult.restore(grouptask_id, app=celery_app)
+    results = [result.get() for result in group_result.results if result.ready()]
+
+    # TODO - we need to cache the input variables of the grouptask. check for desired output format. might be png.
+    # combine results to 1 geojson
+    if "geometry" in results[0][0].keys():
+        results = {
+            "type": "FeatureCollection",
+            "name": "wind_result_" + grouptask_id,
+            "crs": { "type": "name", "properties": { "name": "urn:ogc:def:crs:EPSG::4326" } },
+            "features": [feat for result in results for feat in result]
+        }
 
     # Fields available
     # https://docs.celeryproject.org/en/stable/reference/celery.result.html#celery.result.ResultSet
@@ -58,7 +69,7 @@ def get_grouptask(grouptask_id: str):
         'tasksTotal': len(group_result.results),
         'grouptaskProcessed': group_result.ready(),
         'grouptaskSucceeded': group_result.successful(),
-        'results': [result.get() for result in group_result.results if result.ready()]
+        'results': results
     }
 
     return make_response(
@@ -87,3 +98,8 @@ def get_task(task_id: str):
         response,
         HTTPStatus.OK,
     )
+
+
+
+if __name__ == '__main__':
+    app.run(debug=True, host="0.0.0.0", port=5003)
