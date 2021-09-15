@@ -32,18 +32,16 @@ class InfraredUser:
     """Class to handle Infrared communication for the InfraredUser"""
 
     def __init__(self, reset_user_at_endpoint=False, uuid=None, token=None):
-
-        ic("init new infrared user")
-
         self.uuid = uuid
         self.token = token
-        self.infrared_projects = {}  # {"cityPyoUserId": [InfraredProjects], "cityPyoUserId_2": [InfraredProjects]}
 
         if not self.uuid:
             self.infrared_user_login()
 
         if reset_user_at_endpoint:
             self.delete_all_projects()
+
+        self.all_projects = self.get_all_projects()
 
     # logs in infrared user
     def infrared_user_login(self):
@@ -58,11 +56,22 @@ class InfraredUser:
         else:
             raise Exception("Query failed to login by returning code of {}".format(request.status_code))
 
-    # deletes all projects for a user
+    # deletes all projects for the infrared user
     def delete_all_projects(self):
         for project_uuid in self.get_projects_uuids():
             print(project_uuid, "deleted")
             make_query(wind.queries.delete_project_query(self.uuid, project_uuid), self.token)
+
+    # deletes all projects belonging to a city_pyo_user
+    def delete_all_projects_for_city_pyo_user(self, city_pyo_user):
+        for project_uuid, project in self.all_projects.items():
+            if city_pyo_user in  project["projectName"]:
+                print(project_uuid, "deleted")
+                make_query(wind.queries.delete_project_query(self.uuid, project_uuid), self.token)
+
+        # update all projects variable
+        self.all_projects = self.get_all_projects() 
+
 
     # gets all the user's projects
     def get_all_projects(self):
@@ -161,8 +170,19 @@ class InfraredProject:
 
     """Class to handle Infrared communication for a InfraredProject (one bbox to analyze)"""
 
+    def delete_existing_project_with_same_name(self):
+        for project_uuid, project in self.user.get_all_projects().items():
+            if project["projectName"] == self.name:
+                print("project with name %s already exists. deleting it" % self.name)
+                delete_response = make_query(wind.queries.delete_project_query(self.user.uuid, project_uuid), self.user.token)
+                successfully_del = delete_response['data']['deleteProject']['success']
+                print("success deleting %s" % successfully_del)
+
+
     # for now every calcuation request creates a new infrared project, as calculation bbox is set on project level
     def create_new_project(self):
+        self.delete_existing_project_with_same_name()
+        
         # create new project
         query = wind.queries.create_project_query(self.user.uuid,
                                              self.name,
@@ -171,19 +191,22 @@ class InfraredProject:
                                              self.bbox_size,
                                              self.analysis_grid_resolution
                                              )
-        successfully_created = False
-        while not successfully_created:
-            # creation of new projects sometimes fails
-            try:
-                new_project_response = make_query(query, self.user.token)
-                successfully_created = new_project_response['data']['createNewProject']['success']
-                ic(new_project_response)
-            except Exception as e:
-                print("could not create new project", e)
-                continue
+        # creation of new projects sometimes fails
+        try:
+            new_project_response = make_query(query, self.user.token)
+            successfully_created = new_project_response['data']['createNewProject']['success']
+            project_uuid = get_value(new_project_response, ["data", "createNewProject", "uuid"])
+            self.project_uuid = project_uuid
+            print("project name %s , created: %s" %(self.name, successfully_created))
+        except Exception as e:
+            print("could not create new project", e)
+            self.create_new_project()
 
-        if successfully_created:
-            self.project_uuid = get_value(new_project_response, ["data", "createNewProject", "uuid"])
+        if not successfully_created:
+            print("project not sucessfully created name %s , %s uuid" % (self.name, self.project_uuid))
+            # check if the project got initiated in the end. if not - delete it and recreate.
+            time.sleep(1)
+            self.create_new_project()
 
     # the root snapshot of the infrared project will be used to create buildings and perform analysis
     def get_root_snapshot_id(self):
@@ -248,8 +271,10 @@ class InfraredProject:
 
     # updates all buildings in bbox
     def update_buildings(self, buildings_in_bbox):
-        print("updating buildings for InfraredProject")
+        print("updating buildings for InfraredProject %s" % self.name)
         bbox_buildings_ids = map(lambda bld: bld['city_scope_id'], buildings_in_bbox)
+
+        # TODO the buildings on the project do not persist. 
 
         # delete any removed buildings first
         buildings_to_delete = []
@@ -276,6 +301,9 @@ class InfraredProject:
 
             # create new building
             buildings_to_create.append(city_io_bld)
+        
+        #print("buildings to delete", buildings_to_delete)
+        #print("buildings to create", buildings_to_create)
 
         for uuid in buildings_to_delete:
             self.delete_building(uuid)
@@ -525,7 +553,7 @@ def make_query(query, token_cookie):
     # AIT requested a sleep between the requests. To let their servers breath a bit.
     time.sleep(0.5)
 
-    request = requests.post(get_from_config("api_url"), json={'query': query}, headers={'Cookie': token_cookie})
+    request = requests.post(get_from_config("api_url"), json={'query': query}, headers={'Cookie': token_cookie, 'origin': 'http://infrared.city'})
     if request.status_code == 200:
         return request.json()
     else:

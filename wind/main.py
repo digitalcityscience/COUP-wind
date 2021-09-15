@@ -60,10 +60,22 @@ def update_buildings_for_infrared_project(infrared_project: InfraredProject, cit
 
 
   # get the infrared projects for this city_pyo_user
-def find_existing_projects_at_infrared_endpoint(infrared_user, city_pyo_user):
+def find_existing_projects_at_infrared_endpoint(infrared_user: InfraredUser, city_pyo_user):
     all_projects_at_endpoint = infrared_user.get_all_projects()
-
+    
     if not all_projects_at_endpoint:
+        return []
+    
+    city_pyo_user_project_names = []
+    
+    for project_uuid, project in all_projects_at_endpoint.items():
+        if city_pyo_user in project["projectName"]:
+            city_pyo_user_project_names.append(project["projectName"])
+
+    # endpoint has duplicate projects - sometimes it is a mess there.
+    if len(city_pyo_user_project_names) != len(set(city_pyo_user_project_names)):
+        print("duplicate projects at endpoint!, deleting all")
+        infrared_user.delete_all_projects_for_city_pyo_user(city_pyo_user)
         return []
 
     # create array with {} of buffered boxes and their sw corners
@@ -93,20 +105,32 @@ def find_existing_projects_at_infrared_endpoint(infrared_user, city_pyo_user):
                     city_pyo_user_projects.append(project)
                     break
     
+    print("user has %s projects at infrared endpoint" % len(city_pyo_user_projects))
+    print("project names and uuids")
+    for project in city_pyo_user_projects:
+        print("name %s , uuid %s" %(project["projectName"], project["project_uuid"]))
+    
     return city_pyo_user_projects
 
 
 def create_local_project_instances(infrared_user: InfraredUser, city_pyo_user: str, existing_projects: list):
     # recreate local InfraredProject instances of projects already established at endpoint
     infrared_projects_for_user = []
-    for project in existing_projects:
-        infrared_projects_for_user.append(InfraredProject(
-            infrared_user, project["projectName"], project["bbox"], analysis_resolution, bbox_buffer, project["snapshot_uuid"], project["project_uuid"]
+
+    # existing projects seem to match bbox matrix
+    if len(existing_projects) == len(bbox_matrix):
+        for project in existing_projects:
+            infrared_projects_for_user.append(InfraredProject(
+                infrared_user, project["projectName"], project["bbox"], analysis_resolution, bbox_buffer, project["snapshot_uuid"], project["project_uuid"]
+                )
             )
-        )
+        
+        return infrared_projects_for_user
     
-    # if there are not projects at the Infrared endpoint - create one for each bbox.
-    if not existing_projects:
+    # projects at the Infrared endpoint do not match bbox matrix - create one for each bbox.
+    else:
+        infrared_user.delete_all_projects_for_city_pyo_user(city_pyo_user)
+
         for index, bbox in enumerate(bbox_matrix):
             project = {
                 "projectName": city_pyo_user + "_" + str(index),
@@ -117,7 +141,7 @@ def create_local_project_instances(infrared_user: InfraredUser, city_pyo_user: s
             infrared_projects_for_user.append(infrared_project)    
 
     
-    return infrared_projects_for_user
+        return infrared_projects_for_user
 
 
 def infrared_project_to_json(infrared_project: InfraredProject, result_type: str):
@@ -140,11 +164,13 @@ def infrared_project_to_json(infrared_project: InfraredProject, result_type: str
 # prepares data and requests a calculation at Infrared endpointt
 def start_calculation(scenario: WindScenarioParams, result_type):
     
+    print("length of bbox matrix is %s " % len(bbox_matrix))
+
     # init InfraredUser class to handle communication with AIT api
     infrared_user = InfraredUser()
-    
+
     city_pyo_user_id = scenario.city_pyo_user_id
-    
+
     # get infrared projects for cityPyoUser from AIT endpoint
     existing_projects_at_AIT = find_existing_projects_at_infrared_endpoint(infrared_user, city_pyo_user_id)
     infrared_projects = create_local_project_instances(infrared_user, city_pyo_user_id, existing_projects_at_AIT)
@@ -156,9 +182,10 @@ def start_calculation(scenario: WindScenarioParams, result_type):
     # result_roi = get_result_roi(scenario)  # geodataframe with the Area of Interest for the result
 
     for infrared_project in infrared_projects:
+        print("preparing inputs for project %s" %infrared_project.name)
         # prepare inputs
         update_calculation_settings_for_infrared_project(scenario, infrared_project)
-        # TODO update_buildings_for_infrared_project(infrared_project)
+        # TODO update_buildings_for_infrared_project(infrared_project, cityPyo.get_buildings_gdf_for_user(city_pyo_user_id))
 
         # calculate results
         if not infrared_project.get_result_uuid_for(result_type):
