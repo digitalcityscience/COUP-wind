@@ -19,9 +19,9 @@ Icon
 tmp_tiff/
 
 #local files
-infrared.json
-cityPyo.json
-graph_output.json
+#infrared.json
+#cityPyo.json
+#graph_output.json
 sample_request.sh
 test_polling_wind.py
 
