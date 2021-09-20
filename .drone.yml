@@ -1,0 +1,36 @@
+---
+kind: pipeline
+type: docker
+name: api
+steps:
+- name: build and publish
+  image: plugins/docker
+  settings:
+    repo:
+      from_secret: docker_repository
+    tags:
+      - wind-${DRONE_BRANCH}
+    dockerfile: Dockerfile
+    username:
+      from_secret: docker_username
+    password:
+      from_secret: docker_password
+  when:
+    status: [ success ]
+    branch: [ master ]
+
+- name: deploy
+  image: quving/drone-rancher-cicd:latest
+  settings:
+    stamp: ${DRONE_COMMIT}
+    kubernetes_deployment: wind-api,wind-worker
+    kubernetes_namespace: ${DRONE_BRANCH}
+    rancher_url:
+      from_secret: rancher_url
+    rancher_token:
+      from_secret: rancher_token
+    rancher_context:
+      from_secret: rancher_context
+  when:
+    status: [ success ]
+    branch: [ master ]
