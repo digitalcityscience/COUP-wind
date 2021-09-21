@@ -1,5 +1,5 @@
  {
-  "url": "http://citypyo-api:5000/",
+  "url": "https://api.hcu-dev.de/citypyo/",
   "users": [
         {
             "username": "testuser",
