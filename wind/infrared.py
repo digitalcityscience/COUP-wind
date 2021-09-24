@@ -18,16 +18,6 @@ cwd = os.getcwd()
 config = None
 
 
-# get a value from config
-def get_from_config(key):
-    global config
-    if not config:
-        with open(cwd + "/wind/" + "infrared.json", "r") as inp:
-            config = json.load(inp)
-
-    return config[key]
-
-
 class InfraredUser:
     """Class to handle Infrared communication for the InfraredUser"""
 
@@ -45,8 +35,8 @@ class InfraredUser:
 
     # logs in infrared user
     def infrared_user_login(self):
-        user_creds = {"username": get_from_config("username"), "password": get_from_config("password")}
-        request = requests.post(get_from_config("login_url"), json=user_creds)
+        user_creds = {"username": os.getenv("INFRARED_USERNAME"), "password": os.getenv("INFRARED_PASSWORD")}
+        request = requests.post(os.getenv("INFRARED_URL"), json=user_creds)
 
         if request.status_code == 200:
             # get the auth token from the returned cookie
@@ -125,11 +115,9 @@ class InfraredProject:
             project_uuid=None,
             result_type=None
     ):
-
         # set properties
         self.user = user
         self.name = name
-        self.api_url = get_from_config("api_url")
         self.project_uuid = project_uuid
         self.snapshot_uuid = snapshot_uuid
         self.result_type = result_type
@@ -553,7 +541,7 @@ def make_query(query, token_cookie):
     # AIT requested a sleep between the requests. To let their servers breath a bit.
     # time.sleep(0.5)
 
-    request = requests.post(get_from_config("api_url"), json={'query': query}, headers={'Cookie': token_cookie, 'origin': 'http://infrared.city'})
+    request = requests.post(os.getenv("INFRARED_URL") + '/api', json={'query': query}, headers={'Cookie': token_cookie, 'origin': os.getenv('INFRARED_URL')})
     if request.status_code == 200:
         return request.json()
     else:

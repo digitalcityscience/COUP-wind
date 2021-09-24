@@ -11,16 +11,5 @@ class WindScenarioParams:
         try:
             self.city_pyo_user_id = request_json["city_pyo_user"]
         except:
-            self.set_default_city_pyo_user()
-
-        if not request_json["city_pyo_user"]:
-            self.set_default_city_pyo_user()
-
-            
-    def set_default_city_pyo_user(self):
-        import wind.cityPyo
-        cityPyo = CityPyo()
-        self.city_pyo_user_id = cityPyo.cityPyo_user_ids[0]
-
-
+            raise Exception("Please specify cityPyo user")
     

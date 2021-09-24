@@ -18,15 +18,11 @@ services:
     environment:
       - REDIS_HOST=redis
       - REDIS_PORT=6379
-      - REDIS_PASS=G0rDkQtRcl!E  
-      
-  ait-mock-api:
-    build:
-      context: .
-    ports:
-      - 5555:5555
-    restart: "always"
-    command: python wind/mock_ait_api.py
+      - REDIS_PASS=G0rDkQtRcl!E
+      - INFRARED_URL=http://ait-mock-api:5555/
+      - INFRARED_USERNAME=test
+      - INFRARED_PASSWORD=test
+      - CITY_PYO=https://api.hcu-dev.de/citypyo
 
   worker:
     build:
@@ -37,3 +33,16 @@ services:
       - REDIS_HOST=redis
       - REDIS_PORT=6379
       - REDIS_PASS=G0rDkQtRcl!E
+      - INFRARED_URL=http://ait-mock-api:5555/
+      - INFRARED_USERNAME=test
+      - INFRARED_PASSWORD=test
+      - CITY_PYO=https://api.hcu-dev.de/citypyo
+
+  # run your own ait-mock-api for fast local debugging        
+  ait-mock-api:
+    build:
+      context: .
+    ports:
+      - 5555:5000
+    restart: "always"
+    command: python wind/mock_ait_api.py

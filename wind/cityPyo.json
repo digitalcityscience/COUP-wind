@@ -1,9 +1,0 @@
- {
-  "url": "https://api.hcu-dev.de/citypyo/",
-  "users": [
-        {
-            "username": "testuser",
-            "password": "blubb"
-        }
-    ]
-}
