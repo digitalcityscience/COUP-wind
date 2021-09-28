@@ -11,4 +11,4 @@ from endpoints import app
 if __name__ == '__main__':
     CORS(app)
     app.config['CORS_HEADERS'] = 'Content-Type'
-    app.run(host='0.0.0.0', port=5000, debug=True)
+    app.run(host='0.0.0.0', port=5003, debug=True)
