@@ -44,7 +44,7 @@ class InfraredUser:
             self.uuid = request.cookies.get("InFraReDClientUuid")
             self.token = "InFraReD=" + request.cookies.get("InFraReD")
         else:
-            raise Exception("Query failed to login by returning code of {}".format(request.status_code))
+            raise Exception("Failed to login to infrared by returning code of {}".format(request.status_code))
 
     # deletes all projects for the infrared user
     def delete_all_projects(self):
@@ -139,7 +139,7 @@ class InfraredProject:
 
         # Placeholders
         self.gdf_result_roi = None
-        self.buildings = {}
+        self.buildings = []
         self.wind_speed = None
         self.wind_direction = None
         self.wind_result_uuid = None
@@ -261,6 +261,7 @@ class InfraredProject:
     def update_buildings(self, buildings_in_bbox):
         print("updating buildings for InfraredProject %s" % self.name)
         bbox_buildings_ids = map(lambda bld: bld['city_scope_id'], buildings_in_bbox)
+        self.buildings = buildings_in_bbox
 
         # TODO the buildings on the project do not persist. 
 

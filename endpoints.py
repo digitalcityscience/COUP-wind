@@ -6,20 +6,25 @@ from flask import Flask, request, abort, make_response, jsonify
 
 import tasks
 from mycelery import app as celery_app
+import werkzeug
+
 
 app = Flask(__name__)
 
 
-@app.errorhandler(404)
-def not_found(message: str):
+@app.errorhandler(werkzeug.exceptions.NotFound)
+def not_found(exception: werkzeug.exceptions.NotFound):
+
     return make_response(
-        jsonify({'error': message}),
+        jsonify({'error': "Could not find the requested url"}),
         404
     )
 
 
-@app.errorhandler(400)
-def bad_request(message: str):
+@app.errorhandler( werkzeug.exceptions.BadRequest)
+def bad_request(exception:  werkzeug.exceptions.BadRequest):
+    message = str(exception)
+    
     return make_response(
         jsonify({'error': message}),
         400
@@ -29,8 +34,16 @@ def bad_request(message: str):
 @app.route("/windtask", methods=['POST'])
 def process_windtask():
     # Validate request
-    if not request.json and not 'tasks' in request.json:
+    if not request.json:
         abort(400)
+    try:
+        # are all relevant params delivered?
+        WindScenarioParams(request.json)
+    except KeyError as missing_arg:
+        abort(400, "Bad Request. Missing argument: %s" % missing_arg)
+    except Exception as e:
+        abort(400, "Bad Request. Exception: %s" %e)
+
 
     # Parse requests
     try:
