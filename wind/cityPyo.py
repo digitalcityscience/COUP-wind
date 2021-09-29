@@ -1,7 +1,6 @@
 import time
 
 import requests
-import json
 import os
 
 from wind.data import make_gdf_from_geojson
@@ -19,12 +18,12 @@ class CityPyo:
         self.url = os.getenv("CITY_PYO")
 
 
-    def get_buildings_gdf_for_user(self, user_id):
+    def get_buildings_for_user(self, user_id):
         try:
             # prioritize a buildings.json
-            return make_gdf_from_geojson(self.get_layer_for_user(user_id, "buildings"))
+            return self.get_layer_for_user(user_id, "buildings")
         except:
-            return make_gdf_from_geojson(self.get_layer_for_user(user_id, "upperfloor"))
+            return self.get_layer_for_user(user_id, "upperfloor")
 
     def get_layer_for_user(self, user_id, layer_name, recursive_iteration=0):
         data = {

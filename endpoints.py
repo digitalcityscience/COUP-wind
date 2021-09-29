@@ -1,4 +1,5 @@
 from http import HTTPStatus
+from services import get_calculation_input
 from wind.wind_scenario_params import WindScenarioParams
 
 from celery.result import AsyncResult, GroupResult
@@ -41,6 +42,7 @@ def process_task():
     try:
         # are all relevant params delivered?
         wind_scenario = WindScenarioParams(request.json)
+        city_pyo_user_id = request.json["city_pyo_user"]
     except KeyError as missing_arg:
         abort(400, "Bad Request. Missing argument: %s" % missing_arg)
     except Exception as e:
@@ -51,7 +53,7 @@ def process_task():
     # Parse requests
     try:
         # todo how to trigger tasks again??
-        infrared_projects_group_task = tasks.create_infrared_projects_for_cityPyo_user.delay(wind_scenario.city_pyo_user_id)
+        infrared_projects_group_task = tasks.create_infrared_projects_for_cityPyo_user.delay(city_pyo_user_id)
         print("group task id", infrared_projects_group_task)
         result = infrared_projects_group_task.get()
         print("result of infrared project task", result, type(result))
@@ -70,7 +72,7 @@ def process_task():
         print(infrared_projects)
 
         # TODO  test if projects and infrared user really still exist and force recreation if not.
-        single_result = tasks.compute_wind_request.delay(infrared_projects, request.json)
+        single_result = tasks.compute_task.delay(*get_calculation_input(request.json), infrared_projects)
         response = {'taskId': single_result.id}
         print("response returned ", response)
 
@@ -101,7 +103,7 @@ def process_windtask():
 
     # Parse requests
     try:
-        single_result = tasks.compute_wind_request.delay(request.json)
+        single_result = tasks.compute_task.delay(request.json)
         response = {'taskId': single_result.id}
 
         # return jsonify(response), HTTPStatus.OK

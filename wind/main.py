@@ -214,14 +214,14 @@ def create_infrared_project_for_bbox_and_user(infrared_user_json: dict, user_id:
     return infrared_project_to_json(infrared_project, "wind") # todo get rid of wind
 
 
-def start_calculation_for_project(scenario, infrared_project_json):
+def start_calculation_for_project(scenario, buildings, infrared_project_json):
     infrared_project = create_infrared_project_from_json(infrared_project_json)
     scenario = WindScenarioParams(scenario)
     
     print("preparing inputs for project %s" %infrared_project.name)
     # prepare inputs
     update_calculation_settings_for_infrared_project(scenario, infrared_project)
-    # TODO update_buildings_for_infrared_project(infrared_project, cityPyo.get_buildings_gdf_for_user(city_pyo_user_id))
+    # TODO update_buildings_for_infrared_project(infrared_project, buildings)
 
     return infrared_project.trigger_calculation_at_endpoint_for(scenario.result_type)
 

@@ -7,7 +7,7 @@ headers = {
     'Content-type': 'application/json',
 }
 
-data = '{ "city_pyo_user": "", "wind_speed": 25, "wind_direction": 23, "result_format": "geojson", "custom_roi": [], "hash": "6refactor-poll" }'
+data = '{ "city_pyo_user": "90af2ace6cb38ae1588547c6c20dcb36", "wind_speed": 26, "wind_direction": 23, "custom_roi": [] }'
 
 #response = requests.post('http://localhost:5000/windtask', headers=headers, data=data)
 response = requests.post('http://localhost:5003/task', headers=headers, data=data)
