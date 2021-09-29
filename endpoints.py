@@ -7,6 +7,7 @@ from flask import Flask, request, abort, make_response, jsonify
 import tasks
 from mycelery import app as celery_app
 import werkzeug
+import time
 
 
 app = Flask(__name__)
@@ -29,6 +30,59 @@ def bad_request(exception:  werkzeug.exceptions.BadRequest):
         jsonify({'error': message}),
         400
     )
+
+
+
+@app.route("/task", methods=["POST"])
+def process_task():
+    # Validate request
+    if not request.json:
+        abort(400)
+    try:
+        # are all relevant params delivered?
+        wind_scenario = WindScenarioParams(request.json)
+    except KeyError as missing_arg:
+        abort(400, "Bad Request. Missing argument: %s" % missing_arg)
+    except Exception as e:
+        abort(400, "Bad Request. Exception: %s" %e)
+
+    #wind_scenario["result_type"] = "wind"  # TODO make route for sun, ...
+
+    # Parse requests
+    try:
+        # todo how to trigger tasks again??
+        infrared_projects_group_task = tasks.create_infrared_projects_for_cityPyo_user.delay(wind_scenario.city_pyo_user_id)
+        print("group task id", infrared_projects_group_task)
+        result = infrared_projects_group_task.get()
+        print("result of infrared project task", result, type(result))
+        
+        print("infrared_projects_group_task_id")
+        print(infrared_projects_group_task.id)
+        print(type(infrared_projects_group_task.id))
+        group_result = GroupResult.restore(result, app=celery_app)
+        print(group_result, type(group_result))
+        while not group_result.ready():
+            print("waiting for infrared projects to be setup")
+            time.sleep(2)
+        
+        infrared_projects = [result.get() for result in group_result.results if result.ready()]
+        print("everything setup :)")
+        print(infrared_projects)
+
+        # TODO  test if projects and infrared user really still exist and force recreation if not.
+        single_result = tasks.compute_wind_request.delay(infrared_projects, request.json)
+        response = {'taskId': single_result.id}
+        print("response returned ", response)
+
+        # return jsonify(response), HTTPStatus.OK
+        return make_response(
+            jsonify(response),
+            HTTPStatus.OK,
+        )
+    except KeyError:
+        return bad_request("Payload not correctly structured.")
+
+
 
 
 @app.route("/windtask", methods=['POST'])
@@ -64,6 +118,11 @@ def get_grouptask(grouptask_id: str):
     group_result = GroupResult.restore(grouptask_id, app=celery_app)
     result_array = [result.get() for result in group_result.results if result.ready()]
 
+
+
+    # TODO format result here. also union geojsons , then geojson to png.
+
+
     # TODO - we need to cache the input variables of the grouptask. check for desired output format. might be png.
     # combine results to 1 geojson
     geojson = {
@@ -92,7 +151,9 @@ def get_grouptask(grouptask_id: str):
 
 @app.route("/tasks/<task_id>", methods=['GET'])
 def get_task(task_id: str):
+    print("looking for results of this id", task_id)
     async_result = AsyncResult(task_id, app=celery_app)
+    print(async_result)
 
     # Fields available
     # https://docs.celeryproject.org/en/stable/reference/celery.result.html#celery.result.Result

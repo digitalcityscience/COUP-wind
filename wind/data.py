@@ -45,7 +45,7 @@ def get_south_west_corner_coords_of_bbox(bbox):
 
 
 # return an array of dicts, each dict describing a building
-def get_buildings_for_bbox(bbox, buildings_gdf):
+def get_buildings_for_bbox(bbox, buildings_gdf) -> list:
     buildings_in_bbox = []
     sw_x, sw_y = get_south_west_corner_coords_of_bbox(bbox) # south west corner for bbox, as utm.
 

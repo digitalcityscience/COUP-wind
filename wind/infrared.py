@@ -18,6 +18,7 @@ cwd = os.getcwd()
 config = None
 
 
+# TODO move to own file
 class InfraredUser:
     """Class to handle Infrared communication for the InfraredUser"""
 
@@ -45,7 +46,12 @@ class InfraredUser:
             self.token = "InFraReD=" + request.cookies.get("InFraReD")
         else:
             raise Exception("Failed to login to infrared by returning code of {}".format(request.status_code))
-
+    
+    def export_to_json(self):
+        return {
+            "uuid": self.uuid,
+            "token": self.token,
+        }
     # deletes all projects for the infrared user
     def delete_all_projects(self):
         for project_uuid in self.get_projects_uuids():
@@ -446,16 +452,16 @@ class InfraredProject:
         # make query to trigger result calculation on endpoint
         try:
             res = make_query(query, self.user.token)
-            self.set_result_uuid_for(result_type, get_value(res, ['data', service_command, 'uuid']))
+            result_uuid = get_value(res, ['data', service_command, 'uuid'])
+            # TODO delete ? self.set_result_uuid_for(result_type, get_value(res, ['data', service_command, 'uuid']))
+
+            return result_uuid
         except Exception as exception:
             print("calculation for ", result_type, " FAILS")
             print(exception)
 
     # waits for the result to be avaible. Then crops it to the area of interest.
-    def download_result_and_crop_to_roi(self, result_type, result_uuid=None) -> dict:
-        if not result_uuid:
-            result_uuid = self.get_result_uuid_for(result_type)
-
+    def download_result_and_crop_to_roi(self, result_uuid, result_type="wind") -> dict: # TODO get rid of result type
         tries = 0
         max_tries = 100
         response = make_query(wind.queries.get_analysis_output_query(result_uuid, self.snapshot_uuid), self.user.token)
@@ -476,9 +482,10 @@ class InfraredProject:
             # update result, after cropping to roi
             self.crop_result_data_to_roi(result, result_type)
             self.set_result_for(result_type, result)
+            return result
         else:
             self.set_result_for(result_type, None)
-
+            return {}
 
     # private
     def crop_result_data_to_roi(self, result, result_type):

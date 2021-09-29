@@ -7,7 +7,7 @@ from shapely.geometry import Point, Polygon
 
 from wind.cityPyo import CityPyo
 from wind.wind_scenario_params import WindScenarioParams
-from wind.data import get_buildings_for_bbox, \
+from wind.data import init_bbox_matrix_for_project_area, get_buildings_for_bbox, \
     get_project_area_polygons, convert_tif_to_geojson_features, get_project_area_as_gdf, make_gdf_from_coordinates, \
     make_gdf_from_geojson, get_south_west_corner_coords_of_bbox, transformer_to_wgs, transformer_to_utm, init_bbox_matrix_for_project_area
 from wind.infrared import InfraredProject, InfraredUser
@@ -47,7 +47,7 @@ bbox_matrix = init_bbox_matrix_for_project_area(bbox_size)  # subdivide the proj
 
 # updates an infrared project with all relevant information for scenario (buildings, wind_direction, wind_speed)
 def update_calculation_settings_for_infrared_project(scenario: WindScenarioParams, infrared_project: InfraredProject):
-        # update wind_speed and direction
+    # update wind_speed and direction
     infrared_project.update_calculation_settings(scenario.wind_speed, scenario.wind_direction)
 
    
@@ -161,6 +161,81 @@ def infrared_project_to_json(infrared_project: InfraredProject, result_type: str
         }
     }
 
+
+def create_infrared_user_from_json(infrared_user_json):
+    # locally recreate InfraredUser, to handle communication with the Infrared endpoint
+    return InfraredUser(
+        reset_user_at_endpoint=False,
+        uuid = infrared_user_json["uuid"],
+        token = infrared_user_json["token"]
+    )
+    
+
+def create_infrared_project_from_json(infrared_project_json):
+    print("infrared project json")
+    print(infrared_project_json)
+
+    # locally recreate InfraredUser, to handle communication with the Infrared endpoint
+    infrared_user = create_infrared_user_from_json(
+        {
+            "uuid": infrared_project_json["infrared_client"]["uuid"],        
+            "token": infrared_project_json["infrared_client"]["token"]
+        }
+    )
+        
+    # locally recreate infrared project, in order to use result formatting logic
+    infrared_project = InfraredProject(
+            infrared_user, 
+            infrared_project_json["name"], 
+            Polygon(infrared_project_json["bbox_coords"]),
+            infrared_project_json["resolution"],
+            infrared_project_json["buffer"],
+            infrared_project_json["snapshot_uuid"]
+            )
+
+    return infrared_project
+
+def get_grasbrook_bboxes() -> list:
+    return init_bbox_matrix_for_project_area(bbox_size)
+
+
+def create_infrared_project_for_bbox_and_user(infrared_user_json: dict, user_id: str, bbox_coords: list, bbox_id: str) -> dict:
+    infrared_user = create_infrared_user_from_json(infrared_user_json)
+    
+    print(user_id, bbox_id)
+    
+    project = {
+       "projectName": user_id + "_" + str(bbox_id),
+       "bbox": Polygon(bbox_coords),
+    }
+    # create missing projects at AIT endpoint
+    infrared_project = InfraredProject(infrared_user, project["projectName"], project["bbox"], analysis_resolution, bbox_buffer)
+           
+    return infrared_project_to_json(infrared_project, "wind") # todo get rid of wind
+
+
+def start_calculation_for_project(scenario, infrared_project_json):
+    infrared_project = create_infrared_project_from_json(infrared_project_json)
+    scenario = WindScenarioParams(scenario)
+    
+    print("preparing inputs for project %s" %infrared_project.name)
+    # prepare inputs
+    update_calculation_settings_for_infrared_project(scenario, infrared_project)
+    # TODO update_buildings_for_infrared_project(infrared_project, cityPyo.get_buildings_gdf_for_user(city_pyo_user_id))
+
+    return infrared_project.trigger_calculation_at_endpoint_for(scenario.result_type)
+
+
+def collect_result_for_project(result_uuid: str, infrared_project_json: dict):
+    infrared_project = create_infrared_project_from_json(infrared_project_json)
+
+    # download and return result
+    return {
+        "raw_result": infrared_project.download_result_and_crop_to_roi(result_uuid),
+        "infrared_project_json": infrared_project_json
+    }
+
+
 # prepares data and requests a calculation at Infrared endpointt
 def start_calculation(scenario: WindScenarioParams, result_type):
     
@@ -181,6 +256,9 @@ def start_calculation(scenario: WindScenarioParams, result_type):
     # todo refactor result roi later , currently not working
     # result_roi = get_result_roi(scenario)  # geodataframe with the Area of Interest for the result
 
+    # sort projects by amount of buildings, so that most relevant projects get computed first
+    infrared_projects = sorted(infrared_projects, key=lambda p: len(p.buildings), reverse=True) 
+
     for infrared_project in infrared_projects:
         print("preparing inputs for project %s" %infrared_project.name)
         # prepare inputs
@@ -199,7 +277,8 @@ def start_calculation(scenario: WindScenarioParams, result_type):
 
 # collects result of 1 infrared project from AIT api, returns it after formatting
 def collect_and_format_result_from_ait(infrared_project_json: dict, result_format: str, result_type="wind"):
-    
+    print("called collect function for project %s" % infrared_project_json["name"])
+
     # locally recreate InfraredUser, to handle communication with the Infrared endpoint
     infrared_user = InfraredUser(
         reset_user_at_endpoint=False,

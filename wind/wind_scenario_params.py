@@ -7,6 +7,7 @@ class WindScenarioParams:
         self.wind_direction = request_json["wind_direction"]
         self.hash = request_json["hash"]
         self.result_format = request_json["result_format"]
+        self.result_type = "wind" # TODO allow for solar, ..
         
         try:
             self.city_pyo_user_id = request_json["city_pyo_user"]

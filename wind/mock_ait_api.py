@@ -153,6 +153,22 @@ def query():
             clients[client_uuid]["projects"][project_uuid_id] = {"projectName": project_name}
 
             return new_project_response(project_uuid_id)
+        
+        if "deleteProject" in query:
+
+            print(query)
+
+            # get client and create project for client
+            client_uuid = get_Useruuid_from_query(query)
+            project_uuid_id = get_uuid_from_query(query)
+            del clients[client_uuid]["projects"][project_uuid_id]
+
+            return {'data': {
+                'deleteProject': {
+                    'success': True
+                    }
+                }
+            }
 
         if "createNewBuilding" in query:
             return {
