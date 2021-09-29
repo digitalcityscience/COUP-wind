@@ -2,7 +2,7 @@ import json
 import os
 import math
 import numpy as np
-
+from typing import List
 from shapely.geometry import box, Polygon, mapping, MultiPolygon
 
 import rasterio.features
@@ -19,7 +19,6 @@ from pyproj import Transformer
 
 # from pyproj import Transformer
 transformer_to_utm = Transformer.from_crs(4326, 25832, always_xy=False).transform
-#transformer_to_wgs = Transformer.from_crs(25832, 4326).transform
 transformer_to_wgs = Transformer.from_crs(25832, 4326, always_xy=True).transform
 
 
@@ -121,7 +120,7 @@ def make_gdf_from_geojson(geojson) -> geopandas.GeoDataFrame:
     return gdf
 
 # accepts arrays of coordinates (geojson format) and returns a GeoDataFrame, reprojected into utm coords
-def make_gdf_from_coordinates(coordinates: [[float]]) -> geopandas.GeoDataFrame:
+def make_gdf_from_coordinates(coordinates) -> geopandas.GeoDataFrame:
     gdf = geopandas.GeoDataFrame(
         geopandas.GeoSeries([Polygon(pol) for pol in coordinates]),
         columns=["geometry"],
@@ -146,7 +145,7 @@ def init_bbox_matrix_for_project_area(bbox_size):
     return bbox_matrix
 
 # creates a matrix of bboxes covering the project area polygon
-def create_bbox_matrix(polygon, bbox_length) -> [box]:
+def create_bbox_matrix(polygon, bbox_length) -> List[box]:
     bbox_matrix = []
     polygon_envelop = polygon.exterior.envelope
 
@@ -176,7 +175,7 @@ def create_bbox_matrix(polygon, bbox_length) -> [box]:
 
 
 # exports a result to geotif and returns the geotif path
-def export_result_to_geotif(values, bbox_utm, project_name, result_type) -> str:
+def export_result_to_geotif(values, bbox_utm, project_name) -> str:
     np_values = np.array(values, dtype="float32")
     # TODO round values with around doesnt work??
     np_values = np.around(np_values, 1)
@@ -195,7 +194,7 @@ def export_result_to_geotif(values, bbox_utm, project_name, result_type) -> str:
     if not os.path.exists(cwd + "/tmp_tiff/"):
         os.makedirs(cwd + "/tmp_tiff/")
 
-    file_path = cwd + "/tmp_tiff/" + project_name + "_" + result_type +".tif"
+    file_path = cwd + "/tmp_tiff/" + project_name + ".tif"
     with rasterio.open(
             file_path,
             'w+',
@@ -215,7 +214,7 @@ def export_result_to_geotif(values, bbox_utm, project_name, result_type) -> str:
 
 
 # uses the result as geotif and a geodataframe to clip the results to the area of interest
-def clip_geotif_with_geodf(tif_path, gdfs_to_clip_to: [geopandas.GeoDataFrame]):
+def clip_geotif_with_geodf(tif_path, gdfs_to_clip_to: List[geopandas.GeoDataFrame]):
     xds = rioxarray.open_rasterio(tif_path)
 
     try:
@@ -249,7 +248,7 @@ def get_bounds_for_geotif(tif_path):
 
 
 # converts tif to geojson and returns feature array
-def convert_tif_to_geojson_features(tif_path) -> [{}]:
+def convert_tif_to_geojson_features(tif_path) -> List[dict]:
     features = []
     dataset = rasterio.open(tif_path)
     # Read the dataset's valid data mask as a ndarray.

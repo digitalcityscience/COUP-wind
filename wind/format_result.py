@@ -4,7 +4,6 @@ import math
 from io import BytesIO
 from PIL import Image
 
-
 from wind.infrared import InfraredProject
 from wind.data import convert_tif_to_geojson_features, get_south_west_corner_coords_of_bbox
 

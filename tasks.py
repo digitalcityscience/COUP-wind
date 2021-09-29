@@ -5,7 +5,7 @@ from cache import Cache
 
 from services import get_cache_key, is_valid_md5
 
-from wind.infrared import InfraredUser
+from wind.infrared_user import InfraredUser
 from wind.main import \
     get_grasbrook_bboxes, \
     create_infrared_project_for_bbox_and_user, \

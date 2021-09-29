@@ -249,7 +249,7 @@ def login():
     client_uuid = get_random_uuid_id()
     clients[client_uuid] = {"projects": {}}
 
-    resp = app.make_response(render_template("response_infrared.html"))
+    resp = app.make_response(render_template("mock_response_infrared.html"))
     resp.set_cookie('InFraReD', 'eyJ0eXAi')
     resp.set_cookie('InFraReDClientUuid', client_uuid)
 
