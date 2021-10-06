@@ -169,7 +169,7 @@ class InfraredProject:
 
     # for now every calcuation request creates a new infrared project, as calculation bbox is set on project level
     def create_new_project(self):
-        self.delete_existing_project_with_same_name()
+        # self.delete_existing_project_with_same_name()
         
         # create new project
         query = wind.queries.create_project_query(self.user.uuid,
@@ -188,13 +188,13 @@ class InfraredProject:
             print("project name %s , created: %s" %(self.name, successfully_created))
         except Exception as e:
             print("could not create new project", e)
-            self.create_new_project()
+            # self.create_new_project()
 
-        if not successfully_created:
+        """ if not successfully_created:
             print("project not sucessfully created name %s , %s uuid" % (self.name, self.project_uuid))
             # check if the project got initiated in the end. if not - delete it and recreate.
             time.sleep(1)
-            self.create_new_project()
+            self.create_new_project() """
 
     # the root snapshot of the infrared project will be used to create buildings and perform analysis
     def get_root_snapshot_id(self):
