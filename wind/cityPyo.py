@@ -3,8 +3,6 @@ import time
 import requests
 import os
 
-from wind.data import make_gdf_from_geojson
-
 cwd = os.getcwd()
 
 
@@ -53,32 +51,3 @@ class CityPyo:
             return self.get_layer_for_user(user_id, layer_name, recursive_iteration)
 
         return response.json()
-
-
-    def post(self, user_id, scenario_hash, payload, result_type, nested_keys=None):
-        if nested_keys is None:
-            nested_keys = []
-        print("\n sending to cityPyo")
-
-        try:
-            query = result_type + '_' + scenario_hash   # todo replace with result type (wind, sun, solar)
-            if nested_keys:
-                for nested_key in nested_keys:
-                    query += "/" + nested_key
-
-            data = {
-                "userid": user_id,
-                "data": payload
-            }
-            response = requests.post(self.url + "addLayerData/" + query, json=data)
-
-            if not response.status_code == 200:
-                print("could not post to cityPyo")
-                print("Error code", response.status_code)
-            else:
-                print("\n")
-                print("result send to cityPyo.", "Result type and hash: ", result_type, ", ", scenario_hash)
-            # exit on request exception (cityIO down)
-        except requests.exceptions.RequestException as e:
-            print("CityPyo error. " + str(e))
-

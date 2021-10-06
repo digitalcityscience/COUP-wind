@@ -4,8 +4,8 @@ import math
 from io import BytesIO
 from PIL import Image
 
-from wind.infrared import InfraredProject
-from wind.data import convert_tif_to_geojson_features, get_south_west_corner_coords_of_bbox
+from wind.infrared_project import InfraredProject
+from wind.data import convert_tif_to_geojson, get_south_west_corner_coords_of_bbox
 
 def format_result(infrared_project: InfraredProject, result_type: str,  out_format: str):
     result = infrared_project.get_result_for(result_type)
@@ -16,8 +16,8 @@ def format_result(infrared_project: InfraredProject, result_type: str,  out_form
 
     # return array of geojson like features
     if out_format == "geojson":
-        features = convert_tif_to_geojson_features(infrared_project.get_result_geotif_for(result_type))
-        return features
+        geojson = convert_tif_to_geojson(infrared_project.get_result_geotif_for(result_type))
+        return geojson["features"]
 
     
     # return a geotiff

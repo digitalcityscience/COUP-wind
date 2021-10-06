@@ -7,11 +7,11 @@ headers = {
     'Content-type': 'application/json',
 }
 
-data = '{ "city_pyo_user": "90af2ace6cb38ae1588547c6c20dcb36", "wind_speed": 26, "wind_direction": 26, "custom_roi": [] }'
+data = '{ "city_pyo_user": "90af2ace6cb38ae1588547c6c20dcb36", "wind_speed": 195, "wind_direction": 49, "custom_roi": [] }'
 
 #response = requests.post('http://localhost:5000/windtask', headers=headers, data=data)
 response = requests.post('http://localhost:5003/task', headers=headers, data=data)
-
+print("response", response)
 task_id = response.json()['taskId']
 print("Received taskId:", task_id)
 

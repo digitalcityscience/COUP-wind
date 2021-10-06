@@ -1,8 +1,9 @@
+from attr.setters import convert
 from shapely.geometry import Polygon
 
 from wind.cityPyo import CityPyo
-from wind.wind_scenario_params import WindScenarioParams
-from wind.data import init_bbox_matrix_for_project_area, get_buildings_for_bbox, init_bbox_matrix_for_project_area
+from wind.wind_scenario_params import ScenarioParams
+from wind.data import convert_tif_to_geojson, init_bbox_matrix_for_project_area, get_buildings_for_bbox, init_bbox_matrix_for_project_area, make_gdf_from_geojson
 from wind.infrared_user import InfraredUser
 from wind.infrared_project import InfraredProject
 
@@ -38,15 +39,14 @@ bbox_matrix = init_bbox_matrix_for_project_area(bbox_size)  # subdivide the proj
 #         infrared_user = init_infrared_user()
 
 
-# updates an infrared project with all relevant information for scenario (buildings, wind_direction, wind_speed)
-def update_calculation_settings_for_infrared_project(scenario: WindScenarioParams, infrared_project: InfraredProject):
-    # update wind_speed and direction
-    infrared_project.update_calculation_settings(scenario.wind_speed, scenario.wind_direction)
-
    
 # updates an infrared project with all relevant information for scenario (buildings, wind_direction, wind_speed)
 def update_buildings_for_infrared_project(infrared_project: InfraredProject, cityPyo_buildings):
     # update buildings for each infrared project instance
+    gdf = make_gdf_from_geojson(cityPyo_buildings)
+    if gdf.crs is not "EPSG:25832":
+        gdf = gdf.to_crs("EPSG:25832")
+
     buildings_in_bbox = get_buildings_for_bbox(infrared_project.buffered_bbox_utm, cityPyo_buildings)
 
     infrared_project.update_buildings(buildings_in_bbox)
@@ -77,7 +77,8 @@ def create_infrared_project_from_json(infrared_project_json):
             Polygon(infrared_project_json["bbox_coords"]),
             infrared_project_json["resolution"],
             infrared_project_json["buffer"],
-            infrared_project_json["snapshot_uuid"]
+            infrared_project_json["snapshot_uuid"],
+            infrared_project_json["project_uuid"]
             )
 
     return infrared_project
@@ -103,14 +104,17 @@ def create_infrared_project_for_bbox_and_user(infrared_user_json: dict, user_id:
     return infrared_project.export_to_json()
 
 
-# trigger calculation at AIT endpoint for a infrared_project with given scenario settings and buildings
-def start_calculation_for_project(scenario, buildings, infrared_project_json):
+# trigger calculation at AIT endpoint for a infrared_project with given scenario settings and buildings [geojson]
+def start_calculation_for_project(scenario: dict, buildings: dict, infrared_project_json: dict):
     infrared_project = create_infrared_project_from_json(infrared_project_json)
-    scenario = WindScenarioParams(scenario)
+    
+    print("scenario", scenario)
+    
+    scenario = ScenarioParams(scenario)
     
     print("preparing inputs for project %s" %infrared_project.name)
     # prepare inputs
-    # TODO update_buildings_for_infrared_project(infrared_project, buildings)
+    #update_buildings_for_infrared_project(infrared_project, buildings)
 
     return infrared_project.trigger_calculation_at_endpoint_for(scenario)
 
@@ -118,11 +122,11 @@ def start_calculation_for_project(scenario, buildings, infrared_project_json):
 # collects the result of a triggered calculation
 def collect_result_for_project(result_uuid: str, infrared_project_json: dict):
     infrared_project = create_infrared_project_from_json(infrared_project_json)
+    infrared_project.download_result_and_crop_to_roi(result_uuid)
+    geojson = convert_tif_to_geojson(infrared_project.result_geotif)
 
     # download and return result
     return {
-        "raw_result": infrared_project.download_result_and_crop_to_roi(result_uuid),
+        "geojson": geojson,
         "infrared_project_json": infrared_project_json
     }
-
-

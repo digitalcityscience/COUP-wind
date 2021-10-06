@@ -2,13 +2,12 @@ import requests
 import os
 
 import wind.queries
-
+from wind.queries import make_query
 
 cwd = os.getcwd()
 config = None
 
 
-# TODO move to own file
 class InfraredUser:
     """Class to handle Infrared communication for the InfraredUser"""
 
@@ -46,14 +45,14 @@ class InfraredUser:
     def delete_all_projects(self):
         for project_uuid in self.get_projects_uuids():
             print(project_uuid, "deleted")
-            make_query(wind.queries.delete_project_query(self.uuid, project_uuid), self.token)
+            make_query(wind.queries.delete_project_query(self.uuid, project_uuid), self)
 
     # deletes all projects belonging to a city_pyo_user
     def delete_all_projects_for_city_pyo_user(self, city_pyo_user):
         for project_uuid, project in self.all_projects.items():
             if city_pyo_user in  project["projectName"]:
                 print(project_uuid, "deleted")
-                make_query(wind.queries.delete_project_query(self.uuid, project_uuid), self.token)
+                make_query(wind.queries.delete_project_query(self.uuid, project_uuid), self)
 
         # update all projects variable
         self.all_projects = self.get_all_projects() 
@@ -61,7 +60,7 @@ class InfraredUser:
 
     # gets all the user's projects
     def get_all_projects(self):
-        all_projects = make_query(wind.queries.get_projects_query(self.uuid), self.token)
+        all_projects = make_query(wind.queries.get_projects_query(self.uuid), self)
 
         try:
             projects = get_value(
@@ -84,7 +83,7 @@ class InfraredUser:
     def get_root_snapshot_id_for_project_uuid(self, project_uuid):
         graph_snapshots_path = ["data", "getSnapshotsByProjectUuid", "infraredSchema", "clients", self.uuid,
                                 "projects", project_uuid, "snapshots"]
-        snapshot = make_query(wind.queries.get_snapshot_query(project_uuid), self.token)
+        snapshot = make_query(wind.queries.get_snapshot_query(project_uuid), self)
 
         snapshot_uuid = list(get_value(snapshot, graph_snapshots_path).keys())[0]
 
@@ -98,14 +97,14 @@ class InfraredUser:
     def keep_alive_ping(self):
         self.get_projects_uuids()
 
-
+"""
 # TODO move to 1 single file
 # make query to infrared api
 def make_query(query, token_cookie):
-    """
+    ""
         Make query response
         auth token needs to be send as cookie
-    """
+    ""
     # print(query)
 
     # AIT requested a sleep between the requests. To let their servers breath a bit.
@@ -116,7 +115,7 @@ def make_query(query, token_cookie):
         return request.json()
     else:
         raise Exception("Query failed to run by returning code of {}. {}".format(request.status_code, query))
-
+"""
 
 # gets a values from a nested object
 def get_value(data, path):

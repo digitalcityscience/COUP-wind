@@ -10,10 +10,8 @@ import rasterio.warp
 from rasterio.transform import Affine
 
 import geopandas
-
 import rioxarray
 from rioxarray.exceptions import NoDataInBounds as NoRioDataException
-
 from pyproj import Transformer
 
 
@@ -114,8 +112,12 @@ def make_gdf_from_geojson(geojson) -> geopandas.GeoDataFrame:
     for property_key in geojson["features"][0]["properties"].keys():
         gdf_cols.append(property_key)
 
-    gdf = geopandas.GeoDataFrame.from_features(geojson["features"], crs="EPSG:4326", columns=gdf_cols)
-    gdf = gdf.to_crs("EPSG:25832")  # reproject to utm coords
+    try:
+        crs = geojson["crs"]["properties"]["name"]
+    except KeyError:
+       crs="EPSG:4326" 
+
+    gdf = geopandas.GeoDataFrame.from_features(geojson["features"], crs=crs, columns=gdf_cols)
 
     return gdf
 
@@ -248,7 +250,7 @@ def get_bounds_for_geotif(tif_path):
 
 
 # converts tif to geojson and returns feature array
-def convert_tif_to_geojson_features(tif_path) -> List[dict]:
+def convert_tif_to_geojson(tif_path) -> List[dict]:
     features = []
     dataset = rasterio.open(tif_path)
     # Read the dataset's valid data mask as a ndarray.
@@ -277,4 +279,41 @@ def convert_tif_to_geojson_features(tif_path) -> List[dict]:
     gdf = gdf.to_crs("EPSG:4326")
     reprojected_features_geojson = json.loads(gdf.to_json(na='null', show_bbox=False))  # features in geojson format
 
-    return reprojected_features_geojson["features"]
+    return reprojected_features_geojson
+
+
+# gets a values from a nested object
+def get_value(data, path):
+    for prop in path:
+        if len(prop) == 0:
+            continue
+        if prop.isdigit():
+            prop = int(prop)
+        data = data[prop]
+    return data
+
+
+# get size of the bbox (assuming squares)
+def get_bbox_size(bbox):
+    x_cooords = bbox.exterior.xy[0]
+
+    return max(x_cooords) - min(x_cooords)
+
+
+# takes and array of geojsons and merges them into one
+def summarize_multiple_geojsons_to_one(geojson_array):
+    # combine array of geojson to 1 geojson
+    all_features = []
+    for result in geojson_array:
+        all_features.extend(result["features"])
+    
+    results_gdf = geopandas.GeoDataFrame.from_features(
+        all_features,
+        crs="EPSG:4326",
+        columns=list(all_features[0]["properties"].keys()) + ["geometry"]
+    )
+    
+    # dissolve polygons with the same value in the "value" column
+    results_gdf.dissolve(by='value')
+    
+    return json.loads(results_gdf.to_json())

@@ -1,4 +1,3 @@
-import requests
 import os
 import time
 
@@ -6,9 +5,9 @@ from shapely.ops import transform
 from shapely.geometry import Polygon
 
 from wind.data import export_result_to_geotif, clip_geotif_with_geodf, get_south_west_corner_coords_of_bbox, \
-    get_bounds_for_geotif, transformer_to_wgs
-
+    get_bounds_for_geotif, transformer_to_wgs, get_bbox_size, get_value
 import wind.queries
+from wind.queries import make_query
 from wind.infrared_user import InfraredUser
 
 cwd = os.getcwd()
@@ -25,14 +24,12 @@ class InfraredProject:
             bbox_buffer,
             snapshot_uuid=None,
             project_uuid=None,
-            result_type=None
     ):
         # set properties
         self.user = user
         self.name = name
         self.project_uuid = project_uuid
         self.snapshot_uuid = snapshot_uuid
-        self.result_type = result_type
 
         # set bbox properties
         self.bbox_utm  = bbox_utm
@@ -64,7 +61,8 @@ class InfraredProject:
             self.get_root_snapshot_id()
             self.delete_osm_geometries()
 
-
+    """ Project Creation """
+    
     # for now every calcuation request creates a new infrared project, as calculation bbox is set on project level
     def create_new_project(self):
         self.delete_existing_project_with_same_name()
@@ -78,8 +76,9 @@ class InfraredProject:
                                              self.analysis_grid_resolution
                                              )
         # creation of new projects sometimes fails
+        successfully_created = False
         try:
-            new_project_response = make_query(query, self.user.token)
+            new_project_response = make_query(query, self.user)
             successfully_created = new_project_response['data']['createNewProject']['success']
             project_uuid = get_value(new_project_response, ["data", "createNewProject", "uuid"])
             self.project_uuid = project_uuid
@@ -99,7 +98,7 @@ class InfraredProject:
         for project_uuid, project in self.user.get_all_projects().items():
             if project["projectName"] == self.name:
                 print("project with name %s already exists. deleting it" % self.name)
-                delete_response = make_query(wind.queries.delete_project_query(self.user.uuid, project_uuid), self.user.token)
+                delete_response = make_query(wind.queries.delete_project_query(self.user.uuid, project_uuid), self.user)
                 successfully_del = delete_response['data']['deleteProject']['success']
                 print("success deleting %s" % successfully_del)
 
@@ -125,7 +124,7 @@ class InfraredProject:
     def get_root_snapshot_id(self):
         graph_snapshots_path = ["data", "getSnapshotsByProjectUuid", "infraredSchema", "clients", self.user.uuid,
                                 "projects", self.project_uuid, "snapshots"]
-        snapshot = make_query(wind.queries.get_snapshot_query(self.project_uuid), self.user.token)
+        snapshot = make_query(wind.queries.get_snapshot_query(self.project_uuid), self.user)
 
         self.snapshot_uuid = list(get_value(snapshot, graph_snapshots_path).keys())[0]
 
@@ -143,7 +142,7 @@ class InfraredProject:
         # get all geometries in snapshot
         snapshot_geometries = make_query(
             wind.queries.get_geometry_objects_in_snapshot_query(self.snapshot_uuid),
-            self.user.token
+            self.user
         )
 
         self.delete_all_buildings(snapshot_geometries)
@@ -161,7 +160,7 @@ class InfraredProject:
 
         # delete all buildings
         for building_uuid in buildings_uuids:
-            make_query(wind.queries.delete_building(self.snapshot_uuid, building_uuid), self.user.token)  # todo async
+            make_query(wind.queries.delete_building(self.snapshot_uuid, building_uuid), self.user)  # todo async
 
     # deletes all streets
     def delete_all_streets(self, snapshot_geometries):
@@ -180,13 +179,17 @@ class InfraredProject:
         for street_uuid in streets_uuids:
             self.delete_street(street_uuid)  # todo async """
 
+
     def delete_street(self, street_uuid):
         pass
         # currently streets have no effect at endpoint. ignore changes.
-        # make_query(wind.queries.delete_street(self.snapshot_uuid, street_uuid), self.user.token)
+        # make_query(wind.queries.delete_street(self.snapshot_uuid, street_uuid), self.user)
         # del self.streets[street_uuid]
         # self.reset_results()  # reset results after buildings changed
 
+
+
+    """ Project Updates """
 
     # updates all buildings in bbox
     def update_buildings(self, buildings_in_bbox):
@@ -195,6 +198,7 @@ class InfraredProject:
         self.buildings = buildings_in_bbox
 
         # TODO the buildings on the project do not persist. 
+
 
         # delete any removed buildings first
         buildings_to_delete = []
@@ -233,13 +237,13 @@ class InfraredProject:
 
 
     def delete_building(self, building_uuid):
-        make_query(wind.queries.delete_building(self.snapshot_uuid, building_uuid), self.user.token)
+        make_query(wind.queries.delete_building(self.snapshot_uuid, building_uuid), self.user)
         del self.buildings[building_uuid]
         self.reset_results()  # reset results after buildings changed
 
 
     def create_new_building(self, new_building):
-        new_bld_response = make_query(wind.queries.create_building_query(new_building, self.snapshot_uuid), self.user.token)
+        new_bld_response = make_query(wind.queries.create_building_query(new_building, self.snapshot_uuid), self.user)
         uuid = get_value(new_bld_response, ["data", "createNewBuilding", "uuid"])
 
         if not uuid:
@@ -250,6 +254,7 @@ class InfraredProject:
         self.reset_results()  # reset results after buildings have changed
 
 
+    """ Project Result Handling"""
 
     def trigger_calculation_at_endpoint_for(self, scenario):
 
@@ -269,7 +274,7 @@ class InfraredProject:
 
         # make query to trigger result calculation on endpoint
         try:
-            res = make_query(query, self.user.token)
+            res = make_query(query, self.user)
             result_uuid = get_value(res, ['data', service_command, 'uuid'])
             
             return result_uuid
@@ -283,12 +288,12 @@ class InfraredProject:
     def download_result_and_crop_to_roi(self, result_uuid) -> dict:
         tries = 0
         max_tries = 100
-        response = make_query(wind.queries.get_analysis_output_query(result_uuid, self.snapshot_uuid), self.user.token)
+        response = make_query(wind.queries.get_analysis_output_query(result_uuid, self.snapshot_uuid), self.user)
 
         # wait for result to arrive
         while (not get_value(response, ["data", "getAnalysisOutput", "infraredSchema"])) and tries <= max_tries:
             tries += 1
-            response = make_query(wind.queries.get_analysis_output_query(result_uuid, self.snapshot_uuid), self.user.token)
+            response = make_query(wind.queries.get_analysis_output_query(result_uuid, self.snapshot_uuid), self.user)
             time.sleep(2)  # give the API some time to calc something
 
         if not tries > max_tries:
@@ -331,12 +336,12 @@ class InfraredProject:
         return geo_tif_path
 
 
-    def get_bounds_of_geotif_bounds(self, result_type, projection='utm'):
+    def get_bounds_of_geotif_bounds(self, projection='utm'):
         import rasterio
         dataset = rasterio.open(self.result_geotif)
 
         # BoundingBox(left=358485.0, bottom=4028985.0, right=590415.0, top=4265115.0)
-        left, bottom, right, top = get_bounds_for_geotif(self.get_result_geotif_for(result_type))
+        left, bottom, right, top = get_bounds_for_geotif(self.result_geotif)
         boundsPoly = Polygon([
             [left, bottom],
             [right, bottom],
@@ -353,39 +358,3 @@ class InfraredProject:
             return transform(transformer_to_wgs, boundsPoly)
 
         raise NotImplementedError
-
-
-# make query to infrared api
-def make_query(query, token_cookie):
-    """
-        Make query response
-        auth token needs to be send as cookie
-    """
-    # print(query)
-
-    # AIT requested a sleep between the requests. To let their servers breath a bit.
-    # time.sleep(0.5)
-
-    request = requests.post(os.getenv("INFRARED_URL") + '/api', json={'query': query}, headers={'Cookie': token_cookie, 'origin': os.getenv('INFRARED_URL')})
-    if request.status_code == 200:
-        return request.json()
-    else:
-        raise Exception("Query failed to run by returning code of {}. {}".format(request.status_code, query))
-
-
-# gets a values from a nested object
-def get_value(data, path):
-    for prop in path:
-        if len(prop) == 0:
-            continue
-        if prop.isdigit():
-            prop = int(prop)
-        data = data[prop]
-    return data
-
-
-# get size of the bbox (assuming squares)
-def get_bbox_size(bbox):
-    x_cooords = bbox.exterior.xy[0]
-
-    return max(x_cooords) - min(x_cooords)
