@@ -1,10 +1,9 @@
-import os
-import datetime
 import json
 import uuid
+import time
 
 from flask import Flask, request, abort, render_template
-from flask_cors import CORS, cross_origin
+from flask_cors import CORS
 
 
 app = Flask(__name__, template_folder='./')
@@ -58,6 +57,7 @@ def get_client_uuid_for_project_uuid(project_uuid):
 
 
 def get_client_uuid_and_project_uuid_for_snapshot(snapshot_uuid):
+    print("these are the stored clients", clients)
     for client in clients.keys():
         for project in clients[client]["projects"].keys():
             if snapshot_uuid in clients[client]["projects"][project]["snapshots"].keys():
@@ -65,7 +65,7 @@ def get_client_uuid_and_project_uuid_for_snapshot(snapshot_uuid):
 
 
 def new_analysis_output_response(client_uuid, project_uuid, snapshot_uuid, result_uuid):
-    with open('wind/mock_api_output.json') as fp:
+    with open('wind/mock-api/mock_api_output.json') as fp:
         mock_api_output = json.load(fp)
 
     return {"data": {
@@ -96,8 +96,11 @@ def snapshot_response(client_uuid, project_uuid, snapshot_uuid):
 
 def project_uuids_response(client_uuid):
 
-    projects = clients[client_uuid]["projects"]
-    print("projects in db", projects)
+    try:
+        projects = clients[client_uuid]["projects"]
+        print("projects in db", projects)
+    except KeyError:
+        projects = {}
 
 
     return { "data": {
@@ -145,6 +148,7 @@ def query():
         if "createNewProject" in query:
 
             print(query)
+            time.sleep(30)
 
             # get client and create project for client
             client_uuid = get_Useruuid_from_query(query)
@@ -153,6 +157,22 @@ def query():
             clients[client_uuid]["projects"][project_uuid_id] = {"projectName": project_name}
 
             return new_project_response(project_uuid_id)
+        
+        if "deleteProject" in query:
+
+            print(query)
+
+            # get client and create project for client
+            client_uuid = get_Useruuid_from_query(query)
+            project_uuid_id = get_uuid_from_query(query)
+            del clients[client_uuid]["projects"][project_uuid_id]
+
+            return {'data': {
+                'deleteProject': {
+                    'success': True
+                    }
+                }
+            }
 
         if "createNewBuilding" in query:
             return {
@@ -230,10 +250,13 @@ def login():
     if username == "":
         abort(400)
 
-    client_uuid = get_random_uuid_id()
-    clients[client_uuid] = {"projects": {}}
+    client_uuid = '89012835-d8fc-499c-a183-ac904cb6d766'
+    try:
+       projects =  clients[client_uuid]["projects"]
+    except KeyError:
+       clients[client_uuid] = {"projects": {}}
 
-    resp = app.make_response(render_template("response_infrared.html"))
+    resp = app.make_response(render_template("mock_response_infrared.html"))
     resp.set_cookie('InFraReD', 'eyJ0eXAi')
     resp.set_cookie('InFraReDClientUuid', client_uuid)
 

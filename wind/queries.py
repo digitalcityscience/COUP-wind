@@ -1,7 +1,33 @@
 from string import Template
 import json
+import requests
+import os
+import time
+
 
 # returns a query string to create new building in snapshot
+
+# make query to infrared api
+def make_query(query, infrared_user):
+    """
+        Make query response
+        auth token needs to be send as cookie
+    """
+    # print(query)
+
+    # AIT requested a sleep between the requests. To let their servers breath a bit.
+    time.sleep(0.2)
+    token_cookie = infrared_user.token
+    request = requests.post(os.getenv("INFRARED_URL") + '/api', json={'query': query}, headers={'Cookie': token_cookie, 'origin': os.getenv('INFRARED_URL')})
+    if request.status_code == 200:
+        return request.json()
+    if request.status_code == 401:
+        # login again (will get a new token cookie) and reperform request
+        infrared_user.infrared_user_login()
+        return make_query(query, infrared_user)
+    else:
+        raise Exception("Query failed to run by returning code of {}. {}".format(request.status_code, query))
+
 
 
 def create_project_query(user_uuid, name, sw_lat, sw_long, bbox_size, resolution):

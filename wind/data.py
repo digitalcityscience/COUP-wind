@@ -1,8 +1,9 @@
 import json
 import os
 import math
+from geopandas.geodataframe import GeoDataFrame
 import numpy as np
-
+from typing import List
 from shapely.geometry import box, Polygon, mapping, MultiPolygon
 
 import rasterio.features
@@ -10,16 +11,13 @@ import rasterio.warp
 from rasterio.transform import Affine
 
 import geopandas
-
 import rioxarray
 from rioxarray.exceptions import NoDataInBounds as NoRioDataException
-
 from pyproj import Transformer
 
 
 # from pyproj import Transformer
 transformer_to_utm = Transformer.from_crs(4326, 25832, always_xy=False).transform
-#transformer_to_wgs = Transformer.from_crs(25832, 4326).transform
 transformer_to_wgs = Transformer.from_crs(25832, 4326, always_xy=True).transform
 
 
@@ -44,8 +42,8 @@ def get_south_west_corner_coords_of_bbox(bbox):
             return [x, y]
 
 
-# return an array of dicts, each dict describing a building
-def get_buildings_for_bbox(bbox, buildings_gdf):
+# return an array of dicts, each dict describing a building with simple cartesian coordinates (origin 0,0)
+def get_buildings_for_bbox(bbox:Polygon, buildings_gdf: GeoDataFrame) -> list:
     buildings_in_bbox = []
     sw_x, sw_y = get_south_west_corner_coords_of_bbox(bbox) # south west corner for bbox, as utm.
 
@@ -67,7 +65,6 @@ def get_buildings_for_bbox(bbox, buildings_gdf):
                         "geometry": json.dumps(mapping(single_poly)),
                         "height": intersections.loc[index, 'building_height'],
                         "use": intersections.loc[index, 'land_use_detailed_type'],
-                        "city_scope_id": intersections.loc[index, 'city_scope_id']  # todo use city_scope_id
                     })
             # normal polygons
             else:
@@ -75,7 +72,6 @@ def get_buildings_for_bbox(bbox, buildings_gdf):
                     "geometry": json.dumps(mapping(intersections.loc[index, 'geometry'])),
                     "height": intersections.loc[index, 'building_height'],
                     "use": intersections.loc[index, 'land_use_detailed_type'],
-                    "city_scope_id": intersections.loc[index, 'city_scope_id'] # todo use city_scope_id
                 })
 
     return buildings_in_bbox
@@ -115,13 +111,17 @@ def make_gdf_from_geojson(geojson) -> geopandas.GeoDataFrame:
     for property_key in geojson["features"][0]["properties"].keys():
         gdf_cols.append(property_key)
 
-    gdf = geopandas.GeoDataFrame.from_features(geojson["features"], crs="EPSG:4326", columns=gdf_cols)
-    gdf = gdf.to_crs("EPSG:25832")  # reproject to utm coords
+    try:
+        crs = geojson["crs"]["properties"]["name"]
+    except KeyError:
+       crs="EPSG:4326" 
+
+    gdf = geopandas.GeoDataFrame.from_features(geojson["features"], crs=crs, columns=gdf_cols)
 
     return gdf
 
 # accepts arrays of coordinates (geojson format) and returns a GeoDataFrame, reprojected into utm coords
-def make_gdf_from_coordinates(coordinates: [[float]]) -> geopandas.GeoDataFrame:
+def make_gdf_from_coordinates(coordinates) -> geopandas.GeoDataFrame:
     gdf = geopandas.GeoDataFrame(
         geopandas.GeoSeries([Polygon(pol) for pol in coordinates]),
         columns=["geometry"],
@@ -146,7 +146,7 @@ def init_bbox_matrix_for_project_area(bbox_size):
     return bbox_matrix
 
 # creates a matrix of bboxes covering the project area polygon
-def create_bbox_matrix(polygon, bbox_length) -> [box]:
+def create_bbox_matrix(polygon, bbox_length) -> List[box]:
     bbox_matrix = []
     polygon_envelop = polygon.exterior.envelope
 
@@ -176,7 +176,7 @@ def create_bbox_matrix(polygon, bbox_length) -> [box]:
 
 
 # exports a result to geotif and returns the geotif path
-def export_result_to_geotif(values, bbox_utm, project_name, result_type) -> str:
+def export_result_to_geotif(values, bbox_utm, project_name) -> str:
     np_values = np.array(values, dtype="float32")
     # TODO round values with around doesnt work??
     np_values = np.around(np_values, 1)
@@ -195,7 +195,7 @@ def export_result_to_geotif(values, bbox_utm, project_name, result_type) -> str:
     if not os.path.exists(cwd + "/tmp_tiff/"):
         os.makedirs(cwd + "/tmp_tiff/")
 
-    file_path = cwd + "/tmp_tiff/" + project_name + "_" + result_type +".tif"
+    file_path = cwd + "/tmp_tiff/" + project_name + ".tif"
     with rasterio.open(
             file_path,
             'w+',
@@ -215,7 +215,7 @@ def export_result_to_geotif(values, bbox_utm, project_name, result_type) -> str:
 
 
 # uses the result as geotif and a geodataframe to clip the results to the area of interest
-def clip_geotif_with_geodf(tif_path, gdfs_to_clip_to: [geopandas.GeoDataFrame]):
+def clip_geotif_with_geodf(tif_path, gdfs_to_clip_to: List[geopandas.GeoDataFrame]):
     xds = rioxarray.open_rasterio(tif_path)
 
     try:
@@ -249,7 +249,7 @@ def get_bounds_for_geotif(tif_path):
 
 
 # converts tif to geojson and returns feature array
-def convert_tif_to_geojson_features(tif_path) -> [{}]:
+def convert_tif_to_geojson(tif_path) -> List[dict]:
     features = []
     dataset = rasterio.open(tif_path)
     # Read the dataset's valid data mask as a ndarray.
@@ -278,4 +278,41 @@ def convert_tif_to_geojson_features(tif_path) -> [{}]:
     gdf = gdf.to_crs("EPSG:4326")
     reprojected_features_geojson = json.loads(gdf.to_json(na='null', show_bbox=False))  # features in geojson format
 
-    return reprojected_features_geojson["features"]
+    return reprojected_features_geojson
+
+
+# gets a values from a nested object
+def get_value(data, path):
+    for prop in path:
+        if len(prop) == 0:
+            continue
+        if prop.isdigit():
+            prop = int(prop)
+        data = data[prop]
+    return data
+
+
+# get size of the bbox (assuming squares)
+def get_bbox_size(bbox):
+    x_cooords = bbox.exterior.xy[0]
+
+    return max(x_cooords) - min(x_cooords)
+
+
+# takes and array of geojsons and merges them into one
+def summarize_multiple_geojsons_to_one(geojson_array):
+    # combine array of geojson to 1 geojson
+    all_features = []
+    for result in geojson_array:
+        all_features.extend(result["features"])
+    
+    results_gdf = geopandas.GeoDataFrame.from_features(
+        all_features,
+        crs="EPSG:4326",
+        columns=list(all_features[0]["properties"].keys()) + ["geometry"]
+    )
+    
+    # dissolve polygons with the same value in the "value" column
+    results_gdf.dissolve(by='value')
+    
+    return json.loads(results_gdf.to_json())

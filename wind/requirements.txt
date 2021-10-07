@@ -6,7 +6,6 @@ geopandas
 pyproj
 rasterio
 shapely
-icecream
 numpy
 rioxarray
 pygeos
