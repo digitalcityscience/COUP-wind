@@ -21,7 +21,7 @@ def make_query(query, infrared_user):
     request = requests.post(os.getenv("INFRARED_URL") + '/api', json={'query': query}, headers={'Cookie': token_cookie, 'origin': os.getenv('INFRARED_URL')})
     if request.status_code == 200:
         return request.json()
-    if request.status_code == 401:
+    if request.status_code in [401, 500]:
         # login again (will get a new token cookie) and reperform request
         infrared_user.infrared_user_login()
         return make_query(query, infrared_user)
