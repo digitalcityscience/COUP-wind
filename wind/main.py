@@ -43,13 +43,13 @@ bbox_matrix = init_bbox_matrix_for_project_area(bbox_size)  # subdivide the proj
 # updates an infrared project with all relevant information for scenario (buildings, wind_direction, wind_speed)
 def update_buildings_for_infrared_project(infrared_project: InfraredProject, cityPyo_buildings):
     # update buildings for each infrared project instance
-    gdf = make_gdf_from_geojson(cityPyo_buildings)
-    if gdf.crs is not "EPSG:25832":
-        gdf = gdf.to_crs("EPSG:25832")
+    buildings_gdf = make_gdf_from_geojson(cityPyo_buildings)
+    if buildings_gdf.crs is not "EPSG:25832":
+        buildings_gdf = buildings_gdf.to_crs("EPSG:25832")
 
-    buildings_in_bbox = get_buildings_for_bbox(infrared_project.buffered_bbox_utm, cityPyo_buildings)
+    buildings_for_project = get_buildings_for_bbox(infrared_project.buffered_bbox_utm, buildings_gdf)
 
-    infrared_project.update_buildings(buildings_in_bbox)
+    infrared_project.update_buildings(buildings_for_project)
 
 
 def create_infrared_user_from_json(infrared_user_json):
@@ -114,7 +114,7 @@ def start_calculation_for_project(scenario: dict, buildings: dict, infrared_proj
     
     print("preparing inputs for project %s" %infrared_project.name)
     # prepare inputs
-    #update_buildings_for_infrared_project(infrared_project, buildings)
+    update_buildings_for_infrared_project(infrared_project, buildings)
 
     return infrared_project.trigger_calculation_at_endpoint_for(scenario)
 

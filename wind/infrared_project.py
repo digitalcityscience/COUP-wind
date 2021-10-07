@@ -44,7 +44,7 @@ class InfraredProject:
         self.bbox_sw_corner_wgs = get_south_west_corner_coords_of_bbox(self.buffered_bbox_wgs)
 
         # input placeholders
-        self.buildings = []
+        self.buildings = {}
         self.wind_speed = None
         self.wind_direction = None
         
@@ -137,6 +137,24 @@ class InfraredProject:
         return any(self.gdf_result_roi.intersects(self.bbox_utm))
 
 
+    def get_all_buildings(self):
+        snapshot_geometries = make_query(
+            wind.queries.get_geometry_objects_in_snapshot_query(self.snapshot_uuid),
+            self.user
+        )
+
+        building_path = ["data", "getSnapshotGeometryObjects", "infraredSchema", "clients", self.user.uuid,
+                             "projects", self.project_uuid, "snapshots", self.snapshot_uuid, "buildings"]
+        try:
+            buildings = get_value(snapshot_geometries, building_path)
+        except:
+            print("could not get buildings")
+            return {}
+        
+        self.buildings = buildings
+
+        return buildings
+
     # deletes all preexisting geometries that infrared automatically creates from osm
     def delete_osm_geometries(self):
         # get all geometries in snapshot
@@ -147,6 +165,7 @@ class InfraredProject:
 
         self.delete_all_buildings(snapshot_geometries)
         #  self.delete_all_streets(snapshot_geometries)  --- currently streets have no effect on results anyway
+
 
     # deletes all buildings for project on endpoint
     def delete_all_buildings(self, snapshot_geometries):
@@ -185,31 +204,24 @@ class InfraredProject:
         # currently streets have no effect at endpoint. ignore changes.
         # make_query(wind.queries.delete_street(self.snapshot_uuid, street_uuid), self.user)
         # del self.streets[street_uuid]
-        # self.reset_results()  # reset results after buildings changed
 
 
 
     """ Project Updates """
 
     # updates all buildings in bbox
-    def update_buildings(self, buildings_in_bbox):
-        print("updating buildings for InfraredProject %s" % self.name)
-        bbox_buildings_ids = map(lambda bld: bld['city_scope_id'], buildings_in_bbox)
-        self.buildings = buildings_in_bbox
+    def update_buildings(self, buildings_in_bbox: dict):
+        # get the buildings currently saved for project at endpoint
+        buildings_at_endpoint = self.get_all_buildings()
 
-        # TODO the buildings on the project do not persist. 
-
-
-        # delete any removed buildings first
+        # delete any outdated buildings first
         buildings_to_delete = []
-        for uuid, known_building in self.buildings.items():
-            # delete if not in bbox at all (building was allegedly removed from bbox)
-            if known_building["city_scope_id"] not in bbox_buildings_ids:
+        for uuid, building_at_endpoint in buildings_at_endpoint.items():
+            # delete if the building at endpoint has no corresponding building on the current buildings array at cityPyo
+            if building_at_endpoint not in buildings_in_bbox:
                 buildings_to_delete.append(uuid)
-        for uuid in buildings_to_delete:
-            self.delete_building(uuid)
-
-        buildings_to_delete = []
+        
+        # create buildings that are in cityPyo but not at endpoint
         buildings_to_create = []
         # add or update buildings in bbox if changed
         for city_io_bld in buildings_in_bbox:
@@ -217,17 +229,8 @@ class InfraredProject:
                 # building already exists and did not update
                 continue
 
-            # clean up existing buildings
-            for uuid, known_building in self.buildings.items():
-                # delete known building that had been updated
-                if known_building["city_scope_id"] == city_io_bld["city_scope_id"]:
-                    buildings_to_delete.append(uuid)
-
             # create new building
             buildings_to_create.append(city_io_bld)
-        
-        #print("buildings to delete", buildings_to_delete)
-        #print("buildings to create", buildings_to_create)
 
         for uuid in buildings_to_delete:
             self.delete_building(uuid)
@@ -239,7 +242,6 @@ class InfraredProject:
     def delete_building(self, building_uuid):
         make_query(wind.queries.delete_building(self.snapshot_uuid, building_uuid), self.user)
         del self.buildings[building_uuid]
-        self.reset_results()  # reset results after buildings changed
 
 
     def create_new_building(self, new_building):
@@ -251,7 +253,6 @@ class InfraredProject:
             self.create_new_building(new_building)
 
         self.buildings[uuid] = new_building
-        self.reset_results()  # reset results after buildings have changed
 
 
     """ Project Result Handling"""

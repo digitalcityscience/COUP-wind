@@ -1,6 +1,7 @@
 import json
 import os
 import math
+from geopandas.geodataframe import GeoDataFrame
 import numpy as np
 from typing import List
 from shapely.geometry import box, Polygon, mapping, MultiPolygon
@@ -41,8 +42,8 @@ def get_south_west_corner_coords_of_bbox(bbox):
             return [x, y]
 
 
-# return an array of dicts, each dict describing a building
-def get_buildings_for_bbox(bbox, buildings_gdf) -> list:
+# return an array of dicts, each dict describing a building with simple cartesian coordinates (origin 0,0)
+def get_buildings_for_bbox(bbox:Polygon, buildings_gdf: GeoDataFrame) -> list:
     buildings_in_bbox = []
     sw_x, sw_y = get_south_west_corner_coords_of_bbox(bbox) # south west corner for bbox, as utm.
 
@@ -64,7 +65,6 @@ def get_buildings_for_bbox(bbox, buildings_gdf) -> list:
                         "geometry": json.dumps(mapping(single_poly)),
                         "height": intersections.loc[index, 'building_height'],
                         "use": intersections.loc[index, 'land_use_detailed_type'],
-                        "city_scope_id": intersections.loc[index, 'city_scope_id']  # todo use city_scope_id
                     })
             # normal polygons
             else:
@@ -72,7 +72,6 @@ def get_buildings_for_bbox(bbox, buildings_gdf) -> list:
                     "geometry": json.dumps(mapping(intersections.loc[index, 'geometry'])),
                     "height": intersections.loc[index, 'building_height'],
                     "use": intersections.loc[index, 'land_use_detailed_type'],
-                    "city_scope_id": intersections.loc[index, 'city_scope_id'] # todo use city_scope_id
                 })
 
     return buildings_in_bbox
