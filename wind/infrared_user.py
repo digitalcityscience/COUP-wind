@@ -26,7 +26,7 @@ class InfraredUser:
     # logs in infrared user
     def infrared_user_login(self):
         user_creds = {"username": os.getenv("INFRARED_USERNAME"), "password": os.getenv("INFRARED_PASSWORD")}
-        request = requests.post(os.getenv("INFRARED_URL"), json=user_creds, headers={'origin': os.getenv('INFRARED_URL')})
+        request = requests.post(os.getenv("INFRARED_URL"), json=user_creds)
 
         if request.status_code == 200:
             # get the auth token from the returned cookie
