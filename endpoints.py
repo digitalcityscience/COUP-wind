@@ -34,7 +34,7 @@ def bad_request(exception:  werkzeug.exceptions.BadRequest):
     )
 
 
-@app.route("/task", methods=["POST"])
+@app.route("/windtask", methods=["POST"])
 def process_task():
     # Validate request
     if not request.json:
@@ -112,7 +112,12 @@ def get_grouptask(grouptask_id: str):
     if result_array:
         results = summarize_multiple_geojsons_to_one([result["geojson"] for result in result_array])
     else:
-        results = {}
+        # return empty geojson if no results
+        results ={
+            "type": "FeatureCollection",
+            "features": []
+        }
+    
     # TODO format result here. geojson to png?
 
     # Fields available
