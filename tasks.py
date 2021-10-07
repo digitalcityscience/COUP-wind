@@ -7,7 +7,7 @@ from services import check_infrared_projects_still_exist, get_cache_key_compute_
 
 from wind.infrared_user import InfraredUser
 from wind.main import \
-    get_grasbrook_bboxes, \
+    get_bboxes, \
     create_infrared_project_for_bbox_and_user, \
     start_calculation_for_project, \
     collect_result_for_project
@@ -54,7 +54,7 @@ def setup_infrared_projects_for_cityPyo_user(user_id: str, force_recreation: boo
             print("could not find project setup in cache!!")
 
     # else: Initial setup of endpoint: create projects at endpoint and export as json
-    bboxes = get_grasbrook_bboxes()
+    bboxes = get_bboxes(user_id)
     infrared_user = InfraredUser()
     infrared_user_json = infrared_user.export_to_json()
     task_group = group([create_infrared_project.s(infrared_user_json, user_id, list(bbox.exterior.coords), bbox_id) for bbox_id, bbox in enumerate(bboxes)])

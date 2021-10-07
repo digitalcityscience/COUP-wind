@@ -15,7 +15,6 @@ bbox_buffer = (max_bbox_size - bbox_size) / 2
 analysis_resolution = 10  # resolution of analysis in meters
 
 cityPyo = CityPyo()   # TODO externalize collection of buildings!
-bbox_matrix = init_bbox_matrix_for_project_area(bbox_size)  # subdivide the project area into bboxes
 
 
 # TODO externalize
@@ -44,7 +43,7 @@ bbox_matrix = init_bbox_matrix_for_project_area(bbox_size)  # subdivide the proj
 def update_buildings_for_infrared_project(infrared_project: InfraredProject, cityPyo_buildings):
     # update buildings for each infrared project instance
     buildings_gdf = make_gdf_from_geojson(cityPyo_buildings)
-    if buildings_gdf.crs is not "EPSG:25832":
+    if buildings_gdf.crs != "EPSG:25832":
         buildings_gdf = buildings_gdf.to_crs("EPSG:25832")
 
     buildings_for_project = get_buildings_for_bbox(infrared_project.buffered_bbox_utm, buildings_gdf)
@@ -84,8 +83,8 @@ def create_infrared_project_from_json(infrared_project_json):
     return infrared_project
 
 # divides the Grasbrook area into several result tiles (bboxes)
-def get_grasbrook_bboxes() -> list:
-    return init_bbox_matrix_for_project_area(bbox_size)
+def get_bboxes(city_pyo_user) -> list:
+    return init_bbox_matrix_for_project_area(city_pyo_user, bbox_size)
 
 
 # creates a infrared project at the AIT endpoint for a bbox

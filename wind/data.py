@@ -15,6 +15,7 @@ import rioxarray
 from rioxarray.exceptions import NoDataInBounds as NoRioDataException
 from pyproj import Transformer
 
+from wind.cityPyo import CityPyo
 
 # from pyproj import Transformer
 transformer_to_utm = Transformer.from_crs(4326, 25832, always_xy=False).transform
@@ -23,6 +24,7 @@ transformer_to_wgs = Transformer.from_crs(25832, 4326, always_xy=True).transform
 
 cwd = os.getcwd()
 project_area_gdf = None
+cityPyo = CityPyo()
 
 
 # gets [x,y] of the south west corner of the bbox.
@@ -78,16 +80,12 @@ def get_buildings_for_bbox(bbox:Polygon, buildings_gdf: GeoDataFrame) -> list:
 
 
 # returns the project area as gdf
-def get_project_area_as_gdf():
+def get_project_area_as_gdf(city_pyo_user):
     global project_area_gdf
-
-    if isinstance(project_area_gdf, geopandas.GeoDataFrame):
-        # GeoDataFrame of project area already initiated
-        return project_area_gdf
-
+    
     # make GeoDataFrame from project area
-    with open(cwd + "/wind/" + "project_area_utm.geojson") as f:
-        project_area_json = json.load(f)
+    project_area_json = cityPyo.get_layer_for_user(city_pyo_user, "project_area")
+
     gdf = geopandas.GeoDataFrame.from_features(
         project_area_json["features"],
         crs=project_area_json["crs"]["properties"]["name"]
@@ -98,8 +96,8 @@ def get_project_area_as_gdf():
 
 
 # returns geometry of all features of the project area GeoDataFrame
-def get_project_area_polygons() -> geopandas.GeoDataFrame.geometry:
-    gdf = get_project_area_as_gdf()
+def get_project_area_polygons(city_pyo_user) -> geopandas.GeoDataFrame.geometry:
+    gdf = get_project_area_as_gdf(city_pyo_user)
 
     return gdf.geometry
 
@@ -134,9 +132,9 @@ def make_gdf_from_coordinates(coordinates) -> geopandas.GeoDataFrame:
 
 # subdivides the project area into a bbox matrix
 # returns an array of Shapely Polygon
-def init_bbox_matrix_for_project_area(bbox_size):
+def init_bbox_matrix_for_project_area(city_pyo_user, bbox_size):
     # get the polygons describing the project area (e.g. the Grasbrook development area)
-    project_area_polygons = get_project_area_polygons()
+    project_area_polygons = get_project_area_polygons(city_pyo_user)
 
     bbox_matrix = []
     for pol in project_area_polygons:
