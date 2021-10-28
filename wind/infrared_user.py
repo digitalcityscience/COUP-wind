@@ -21,8 +21,6 @@ class InfraredUser:
         if reset_user_at_endpoint:
             self.delete_all_projects()
 
-        self.all_projects = self.get_all_projects()
-
     # logs in infrared user
     def infrared_user_login(self):
         user_creds = {"username": os.getenv("INFRARED_USERNAME"), "password": os.getenv("INFRARED_PASSWORD")}
@@ -49,13 +47,11 @@ class InfraredUser:
 
     # deletes all projects belonging to a city_pyo_user
     def delete_all_projects_for_city_pyo_user(self, city_pyo_user):
-        for project_uuid, project in self.all_projects.items():
+        all_projects =  self.get_all_projects() 
+        for project_uuid, project in all_projects.items():
             if city_pyo_user in  project["projectName"]:
                 print(project_uuid, "deleted")
                 make_query(wind.queries.delete_project_query(self.uuid, project_uuid), self)
-
-        # update all projects variable
-        self.all_projects = self.get_all_projects() 
 
 
     # gets all the user's projects
