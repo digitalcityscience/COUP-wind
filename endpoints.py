@@ -76,32 +76,27 @@ def process_task():
 
 
 
-@app.route("/windtask", methods=['POST'])
-def process_windtask():
-    # Validate request
-    if not request.json:
-        abort(400)
-    try:
-        # are all relevant params delivered?
-        ScenarioParams(request.json)
-    except KeyError as missing_arg:
-        abort(400, "Bad Request. Missing argument: %s" % missing_arg)
-    except Exception as e:
-        abort(400, "Bad Request. Exception: %s" %e)
 
 
-    # Parse requests
-    try:
-        single_result = tasks.compute_task.delay(request.json)
-        response = {'taskId': single_result.id}
 
-        # return jsonify(response), HTTPStatus.OK
-        return make_response(
-            jsonify(response),
-            HTTPStatus.OK,
-        )
-    except KeyError:
-        return bad_request("Payload not correctly structured.")
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 @app.route("/grouptasks/<grouptask_id>", methods=['GET'])
