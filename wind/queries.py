@@ -18,7 +18,10 @@ def make_query(query, infrared_user):
     # AIT requested a sleep between the requests. To let their servers breath a bit.
     time.sleep(0.2)
     token_cookie = infrared_user.token
-    request = requests.post(os.getenv("INFRARED_URL") + '/api', json={'query': query}, headers={'Cookie': token_cookie, 'origin': os.getenv('INFRARED_URL')})
+    url = os.getenv("INFRARED_URL") + '/api'
+    headers={'Cookie': token_cookie, 'origin': os.getenv('INFRARED_URL')}
+    request = requests.post(url, json={'query': query}, headers=headers)
+
     if request.status_code == 200:
         return request.json()
     if request.status_code == 401:
@@ -26,8 +29,13 @@ def make_query(query, infrared_user):
         infrared_user.infrared_user_login()
         return make_query(query, infrared_user)
     else:
-        raise Exception("Query failed to run by returning code of {}. {}".format(request.status_code, query))
-
+        raise Exception("Query failed to run by returning code of {}. URL: {} , Query: {}, Headers: {}".format(
+        request.status_code,
+        url,
+        query,
+        headers
+        )
+      )
 
 
 def create_project_query(user_uuid, name, sw_lat, sw_long, bbox_size, resolution):
