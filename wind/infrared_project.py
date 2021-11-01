@@ -9,8 +9,10 @@ from wind.data import export_result_to_geotif, clip_geotif_with_geodf, get_south
 import wind.queries
 from wind.queries import make_query
 from wind.infrared_user import InfraredUser
+from wind.cityPyo import CityPyo
 
 cwd = os.getcwd()
+cityPyo = CityPyo()
 config = None
 
 """Class to handle Infrared communication for a InfraredProject (one bbox to analyze)"""
@@ -277,6 +279,7 @@ class InfraredProject:
         try:
             res = make_query(query, self.user)
             result_uuid = get_value(res, ['data', service_command, 'uuid'])
+            cityPyo.log_calculation_request(scenario.result_type, result_uuid)
             
             return result_uuid
 

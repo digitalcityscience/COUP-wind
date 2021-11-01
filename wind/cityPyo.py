@@ -1,4 +1,6 @@
 import time
+import datetime
+import warnings
 
 import requests
 import os
@@ -51,3 +53,30 @@ class CityPyo:
             return self.get_layer_for_user(user_id, layer_name, recursive_iteration)
 
         return response.json()
+
+
+    # logs a the performance of a AIT-calculation request to CityPyo
+    def log_calculation_request(self, calc_type: str, result_uuid: str):
+        request_time = str(datetime.datetime.now())
+
+        data = { 
+            "timestamp": request_time,
+            "result_uuid": result_uuid,
+            "calc_type": calc_type,
+            "target_url": os.getenv("INFRARED_URL")
+        }
+
+        request_url = self.url +  "logCalcRequestAIT/"
+
+        try:
+            request = requests.post(request_url, json=data)
+        except:
+            warnings.warn("Could not log calculation request to CityPyo")
+            return
+
+        if not request.status_code == 200:
+            warnings.warn("Could not log AIT request", data)
+
+
+
+
