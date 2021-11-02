@@ -8,5 +8,4 @@ COPY . .
 RUN pip install -r requirements.txt
 RUN pip install -r wind/requirements.txt
 
-# TODO enable cors for entrypoint sh
-CMD ["python", "entrypoint.py"]
+CMD ["bash", "entrypoint.sh"]
