@@ -9,10 +9,14 @@ from flask import Flask, request, abort, make_response, jsonify
 import tasks
 from mycelery import app as celery_app
 import werkzeug
-import geopandas
-import json
+from flask_cors import CORS, cross_origin
+from flask_compress import Compress
+
 
 app = Flask(__name__)
+CORS(app)
+app.config['CORS_HEADERS'] = 'Content-Type'
+Compress(app)
 
 
 @app.errorhandler(werkzeug.exceptions.NotFound)
