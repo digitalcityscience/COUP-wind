@@ -31,12 +31,56 @@ def not_found(exception: werkzeug.exceptions.NotFound):
 @app.errorhandler( werkzeug.exceptions.BadRequest)
 def bad_request(exception:  werkzeug.exceptions.BadRequest):
     message = str(exception)
+
+    print("this is the exception", message)
     
     return make_response(
         jsonify({'error': message}),
         400
     )
 
+
+@app.route("/check_projects_for_user", methods=["POST"])
+def check_projects_for_user():
+    if not request.json:
+        print("no request json.")
+        abort(400)
+    
+    cityPyo_user = request.json["city_pyo_user"]
+    check_successful = False
+    
+    try: 
+        group_task = tasks.setup_infrared_projects_for_cityPyo_user.delay(cityPyo_user, False)
+        infrared_projects = get_infrared_projects_from_group_task(group_task)
+        print(infrared_projects)
+        if check_infrared_projects_still_exist(infrared_projects):
+            # projects still exist, nothing to do.
+            return "success"
+    except Exception as e:
+        print("exception in first check ", e)
+    
+    if not check_successful:
+        print("Projects missing. Need to recreate projects now.")
+        # Try recreating the projects. 
+        # Will get the new login credentials for our Infrared_User and save it to projects
+        try:
+            recreation_group_task = tasks.setup_infrared_projects_for_cityPyo_user.delay(user_id=cityPyo_user, force_recreation=True)
+            infrared_projects = get_infrared_projects_from_group_task(recreation_group_task)
+            check_successful = check_infrared_projects_still_exist(infrared_projects)
+
+        except Exception as e:
+            print("cannot check if projects exist. There might be a general error: ", e)
+            abort(500)
+
+    if not check_successful:
+        print("check for projects failed failed")
+        print("these projects should exist")
+        print(get_infrared_projects_from_group_task(recreation_group_task))
+        abort(500)
+        
+    if check_successful:
+        return "success"
+        
 
 @app.route("/windtask", methods=["POST"])
 def process_task():
@@ -76,31 +120,6 @@ def process_task():
         )
     except KeyError:
         return bad_request("Payload not correctly structured.")
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 @app.route("/grouptasks/<grouptask_id>", methods=['GET'])
