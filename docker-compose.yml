@@ -8,6 +8,8 @@ services:
     command: redis-server --requirepass G0rDkQtRcl!E --appendonly yes
     volumes:
       - "./redis/data:/data"
+    environment: 
+      - TZ=Europe/Berlin
 
   api:
     build:
