@@ -38,7 +38,7 @@ def check_infrared_projects_still_exist(infrared_projects) -> bool:
     all_projects_uuids = infrared_user.get_projects_uuids()
     for project in infrared_projects:
         if not project["project_uuid"] in list(all_projects_uuids):
-            print(project["project_uuid"], list(all_projects_uuids))
+            print(f'Missing project {project["project_uuid"]} in list {list(all_projects_uuids)}')
             return False
     
     return True

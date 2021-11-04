@@ -40,7 +40,7 @@ Each cityPyo user will have it's own set of infrared_projects at AIT endpoint
 ideally this task is only run once as initial setup - and then returns from cache
 """
 @app.task()
-def setup_infrared_projects_for_cityPyo_user(user_id: str, force_recreation: bool):
+def setup_infrared_projects_for_cityPyo_user(user_id: str, force_recreation: bool) -> str:
     
     if not force_recreation:
         # Check cache. If cached, return result from cache.     
