@@ -69,6 +69,7 @@ def check_projects_for_user():
             check_successful = check_infrared_projects_still_exist(infrared_projects)
 
         except Exception as e:
+            print("Failed for cityPyo user ", cityPyo_user)
             print("cannot check if projects exist. There might be a general error: ", e)
             abort(500)
 
