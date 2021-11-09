@@ -3,8 +3,9 @@ import hashlib
 import re
 import time
 
-from celery.result import AsyncResult, GroupResult
+from celery.result import GroupResult
 from mycelery import app as celery_app
+
 
 import wind.cityPyo as cp
 from wind.wind_scenario_params import ScenarioParams
@@ -29,6 +30,10 @@ def get_infrared_projects_from_group_task(group_task) -> list:
 
 
 def check_infrared_projects_still_exist(infrared_projects) -> bool:
+    if not infrared_projects:
+        # make sure to check valid list
+        return False
+    
     infrared_user = InfraredUser(
         reset_user_at_endpoint=False,
         uuid=infrared_projects[0]["infrared_client"]["uuid"],

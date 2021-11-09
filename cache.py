@@ -13,10 +13,16 @@ class Cache:
         )
 
     def save(self, key: str, value: dict):
+
+        print(f'saved to cached key : {key} \n value: {value}')
+
         self.redis_client.set(key, json.dumps(value))
 
     def retrieve(self, key: str) -> dict:
         result = self.redis_client.get(key)
+
+        print(f'retrieved from cache key : {key} \n result: {result}')
+
         if result is None:
             return {}
 

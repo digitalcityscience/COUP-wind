@@ -46,29 +46,32 @@ def check_projects_for_user():
         print("no request json.")
         abort(400)
     
-    cityPyo_user = request.json["city_pyo_user"]
     check_successful = False
+    cityPyo_user = request.json["city_pyo_user"]
+    print("checking project status at AIT for user ", cityPyo_user)
     
     try: 
-        group_task = tasks.setup_infrared_projects_for_cityPyo_user.delay(cityPyo_user, False)
-        infrared_projects = get_infrared_projects_from_group_task(group_task)
-        print(infrared_projects)
-        if check_infrared_projects_still_exist(infrared_projects):
-            # projects still exist, nothing to do.
-            return "success"
-    except Exception as e:
-        print("exception in first check ", e)
+        group_task_projects_creation = tasks.find_group_task_for_infrared_project_creation.delay(cityPyo_user)
+        if group_task_projects_creation:
+            # retrieve infrared projects from cache
+            infrared_projects = get_infrared_projects_from_group_task(group_task_projects_creation)
+            print("infrared projects here ", infrared_projects)
+            if check_infrared_projects_still_exist(infrared_projects):
+                # projects still exist, nothing to do.
+                return "success"
+            else:
+                print("projects missing for cityPyo user", cityPyo_user)
     
-    if not check_successful:
-        print("Projects missing. Need to recreate projects now.")
-        # Try recreating the projects. 
-        # Will get the new login credentials for our Infrared_User and save it to projects
-        try:
-            recreation_group_task = tasks.setup_infrared_projects_for_cityPyo_user.delay(user_id=cityPyo_user, force_recreation=True)
-            infrared_projects = get_infrared_projects_from_group_task(recreation_group_task)
-            check_successful = check_infrared_projects_still_exist(infrared_projects)
-
-        except Exception as e:
+    except Exception as e:
+        print("Exception occured when checking for projects. ", e)
+        print("Trying to reset now")    
+    
+    # try to recreate the projects and check again if projects at endpoint and local are the same.
+    try:
+        recreation_group_task = tasks.setup_infrared_projects_for_cityPyo_user.delay(user_id=cityPyo_user)
+        infrared_projects = get_infrared_projects_from_group_task(recreation_group_task)
+        check_successful = check_infrared_projects_still_exist(infrared_projects)
+    except Exception as e:
             print("Failed for cityPyo user ", cityPyo_user)
             print("cannot check if projects exist. There might be a general error: ", e)
             abort(500)
@@ -99,16 +102,20 @@ def process_task():
 
     #wind_scenario["result_type"] = "wind"  # TODO make route for sun, ...
 
+    are_projects_in_cache = False
+    infrared_projects = []
     # Parse requests
     try:
-        infrared_projects_group_task = tasks.setup_infrared_projects_for_cityPyo_user.delay(city_pyo_user_id, False)
-        infrared_projects = get_infrared_projects_from_group_task(infrared_projects_group_task)
-
-        if not check_infrared_projects_still_exist(infrared_projects):
-            print("Infrared Projects do no longer exist at endpopint")
-            # if projects were deleted at endpoint, enforce recreation and wait for task to be finished.
-            infrared_projects_group_task =tasks.setup_infrared_projects_for_cityPyo_user.delay(city_pyo_user_id, True)
-            infrared_projects = get_infrared_projects_from_group_task(infrared_projects_group_task)
+        group_task_projects_creation = tasks.find_group_task_for_infrared_project_creation.delay(city_pyo_user_id)
+        if group_task_projects_creation:
+            # retrieve infrared projects from cache
+            are_projects_in_cache = True
+            infrared_projects = get_infrared_projects_from_group_task(group_task_projects_creation)
+        
+        # check if projects are cached and still exist. Otherwise recreate them at endpoint.
+        if not (are_projects_in_cache and check_infrared_projects_still_exist(infrared_projects)):
+            group_task_projects_creation = tasks.setup_infrared_projects_for_cityPyo_user.delay(city_pyo_user_id)
+            infrared_projects = get_infrared_projects_from_group_task(group_task_projects_creation)
 
         single_result = tasks.compute_task.delay(*get_calculation_input(request.json), infrared_projects)
         response = {'taskId': single_result.id}
@@ -136,7 +143,7 @@ def get_grouptask(grouptask_id: str):
             "type": "FeatureCollection",
             "features": []
         }
-    
+        
     # TODO format result here. geojson to png?
 
     # Fields available
