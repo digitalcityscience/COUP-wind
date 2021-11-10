@@ -44,6 +44,7 @@ def bad_request(exception:  werkzeug.exceptions.BadRequest):
 def find_result_in_cache(request_json):
     try:
         result = tasks.get_result_from_cache.delay(*get_calculation_input(request_json, hashes_only=True))
+        result.get()  # test if result can be restored        
         print("found result in cache!")
         return result
     
@@ -57,7 +58,8 @@ def find_infrared_projects_in_cache(cityPyo_user):
     try:
         group_task_projects_creation = tasks.get_project_setup_from_cache.delay(cityPyo_user)
         infrared_projects = get_infrared_projects_from_group_task(group_task_projects_creation)
-        
+        infrared_projects.get() # test if the task result can be restored
+
         return infrared_projects
     
     except Exception:
