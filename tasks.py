@@ -18,6 +18,21 @@ cache = Cache()
 
 
 @app.task()
+def get_result_from_cache(
+    scenario_hash: str,
+    buildings_hash: str
+):
+    # Check cache. If cached, return result from cache.
+    key = get_cache_key_compute_task(scenario_hash=scenario_hash, buildings_hash=buildings_hash)
+    result = cache.retrieve(key=key)
+    if not result == {}:
+        return result
+    else: 
+        print("could not find result in cache!!")
+        raise Exception("Could not find setup in cache")
+
+
+@app.task()
 def get_project_setup_from_cache(user_id):
     # Check cache. If cached, return result from cache.     
     key = get_cache_key_setup_task(city_pyo_user=user_id)
@@ -84,14 +99,9 @@ def compute_task(
     buildings: dict,
     infrared_projects: list,
     ):
-    
-    # TODO: could we not have this check before checkiing for infrared_projects???
-    # Check cache. If cached, return result from cache.
-    key = get_cache_key_compute_task(scenario_hash=scenario_hash, buildings_hash=buildings_hash)
-    result = cache.retrieve(key=key)
-    if not result == {}:
-        return result
 
+    print("computing task. Result will be hashed with this key ", get_cache_key_compute_task(scenario_hash, buildings_hash))
+    
     # trigger calculation and collect result for project in infrared_projects
     task_group = group(
         [

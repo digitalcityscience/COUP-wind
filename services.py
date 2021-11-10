@@ -49,17 +49,20 @@ def check_infrared_projects_still_exist(infrared_projects) -> bool:
     return True
 
 
-def get_calculation_input(complex_task):
+def get_calculation_input(complex_task, hashes_only=False):
     # hash noise scenario settings
     wind_params = ScenarioParams(complex_task, "wind")  # TODO get "wind" from endpoint!
-    calculation_settings = wind_params.export_to_json()
-    scenario_hash = hash_dict(calculation_settings)
+    scenario = wind_params.export_to_json()
+    scenario_hash = hash_dict(scenario)
 
     # hash buildings geojson
     buildings = get_buildings_geojson_from_cityPyo(complex_task["city_pyo_user"])
     buildings_hash = hash_dict(buildings)
 
-    return scenario_hash, buildings_hash, calculation_settings, buildings
+    if hashes_only:
+        return scenario_hash, buildings_hash
+
+    return scenario_hash, buildings_hash, scenario, buildings
 
 
 def get_buildings_geojson_from_cityPyo(cityPyo_user_id):

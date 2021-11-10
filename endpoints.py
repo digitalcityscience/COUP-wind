@@ -40,6 +40,19 @@ def bad_request(exception:  werkzeug.exceptions.BadRequest):
     )
 
 
+# tries to find the calculation result in cache, otherwise returns None
+def find_result_in_cache(request_json):
+    try:
+        result = tasks.get_result_from_cache.delay(*get_calculation_input(request_json, hashes_only=True))
+        print("found result in cache!")
+        return result
+    
+    except Exception:
+        print("Result not yet in cache")
+        return None
+
+
+# tries to find infrafred project setup in cache, otherwise returns None
 def find_infrared_projects_in_cache(cityPyo_user):
     try:
         group_task_projects_creation = tasks.get_project_setup_from_cache.delay(cityPyo_user)
@@ -112,26 +125,29 @@ def process_task():
     #wind_scenario["result_type"] = "wind"  # TODO make route for sun, ...
 
     # Parse requests
-    try:
-        infrared_projects = find_infrared_projects_in_cache(city_pyo_user_id)        
-        if not check_infrared_projects_still_exist(infrared_projects):
+    result = find_result_in_cache(request.json)
+    if not result:
+        try:
             # check if projects are cached and still exist. Otherwise recreate them at endpoint.
-            group_task_id_projects_creation = tasks.setup_infrared_projects_for_cityPyo_user.delay(city_pyo_user_id)
-            infrared_projects = get_infrared_projects_from_group_task(group_task_id_projects_creation)
+            infrared_projects = find_infrared_projects_in_cache(city_pyo_user_id)        
+            if not check_infrared_projects_still_exist(infrared_projects):
+                group_task_id_projects_creation = tasks.setup_infrared_projects_for_cityPyo_user.delay(city_pyo_user_id)
+                infrared_projects = get_infrared_projects_from_group_task(group_task_id_projects_creation)
 
-        single_result = tasks.compute_task.delay(*get_calculation_input(request.json), infrared_projects)
-        response = {'taskId': single_result.id}
-        print("response returned ", response)
+            # compute result
+            result = tasks.compute_task.delay(*get_calculation_input(request.json), infrared_projects)
+        
+        except Exception as e:
+            abort(500, e)
+    
+    response = {'taskId': result.id}
+    print("response returned ", response)
 
-        # return jsonify(response), HTTPStatus.OK
-        return make_response(
-            jsonify(response),
-            HTTPStatus.OK,
-        )
-    except KeyError:
-        return bad_request("Payload not correctly structured.")
-    except Exception:
-        return bad_request("Exception found")
+    # return jsonify(response), HTTPStatus.OK
+    return make_response(
+        jsonify(response),
+        HTTPStatus.OK,
+    ) 
 
 
 

@@ -26,8 +26,6 @@ def run_checks():
  
 
 if __name__ == "__main__":
-    
-
     api_url = os.getenv("WIND_API_URL")
     check_projects_route = 'check_projects_for_user'
     headers = {
@@ -41,10 +39,7 @@ if __name__ == "__main__":
     everything_ok = run_checks()
 
     if not everything_ok:
-        # A problem occured. Try to delete all projects at endpoint and recreate them 
-        # todo import properly delete_all_projects()
-        #time.sleep(600) # wait for projects to really be deleted.
-        print("wasnt ok")
+        print("Projects do not seem to be setup right. We should have a ")
     
     
     
