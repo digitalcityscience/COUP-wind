@@ -29,7 +29,7 @@ def get_result_from_cache(
         return result
     else: 
         print("could not find result in cache!!")
-        raise Exception("Could not find setup in cache")
+        raise Exception("Could not find result in cache")
 
 
 @app.task()
@@ -100,7 +100,9 @@ def compute_task(
     infrared_projects: list,
     ):
 
-    print("computing task. Result will be hashed with this key ", get_cache_key_compute_task(scenario_hash, buildings_hash))
+    print(
+        "computing task. Result will be hashed with this key ",
+        get_cache_key_compute_task(scenario_hash=scenario_hash, buildings_hash=buildings_hash))
     
     # trigger calculation and collect result for project in infrared_projects
     task_group = group(
