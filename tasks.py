@@ -18,7 +18,7 @@ cache = Cache()
 
 
 @app.task()
-def find_group_task_for_infrared_project_creation(user_id):
+def get_project_setup_from_cache(user_id):
     # Check cache. If cached, return result from cache.     
     key = get_cache_key_setup_task(city_pyo_user=user_id)
     group_result_id = cache.retrieve(key=key)
@@ -28,7 +28,7 @@ def find_group_task_for_infrared_project_creation(user_id):
         return group_result_id
     else: 
         print("could not find project setup in cache!!")
-        return None
+        raise Exception("Could not find setup in cache")
 
 
 
@@ -85,6 +85,7 @@ def compute_task(
     infrared_projects: list,
     ):
     
+    # TODO: could we not have this check before checkiing for infrared_projects???
     # Check cache. If cached, return result from cache.
     key = get_cache_key_compute_task(scenario_hash=scenario_hash, buildings_hash=buildings_hash)
     result = cache.retrieve(key=key)
@@ -104,11 +105,11 @@ def compute_task(
     
     group_result = task_group()
     group_result.save()
-    
+
     return group_result.id
 
 
-@signals.task_postrun.connect
+@signals.task_postrun.connect()
 def task_postrun_handler(task_id, task, sender=None, *args, **kwargs):
     state = kwargs.get('state')
     func_args = kwargs.get('args')

@@ -40,6 +40,18 @@ def bad_request(exception:  werkzeug.exceptions.BadRequest):
     )
 
 
+def find_infrared_projects_in_cache(cityPyo_user):
+    try:
+        group_task_projects_creation = tasks.get_project_setup_from_cache.delay(cityPyo_user)
+        infrared_projects = get_infrared_projects_from_group_task(group_task_projects_creation)
+        
+        return infrared_projects
+    
+    except Exception:
+        print("Infrafred Project setup for cityPyo User not in cache")
+        return None
+    
+
 @app.route("/check_projects_for_user", methods=["POST"])
 def check_projects_for_user():
     if not request.json:
@@ -51,16 +63,13 @@ def check_projects_for_user():
     print("checking project status at AIT for user ", cityPyo_user)
     
     try: 
-        group_task_projects_creation = tasks.find_group_task_for_infrared_project_creation.delay(cityPyo_user)
-        if group_task_projects_creation:
-            # retrieve infrared projects from cache
-            infrared_projects = get_infrared_projects_from_group_task(group_task_projects_creation)
-            print("infrared projects here ", infrared_projects)
-            if check_infrared_projects_still_exist(infrared_projects):
-                # projects still exist, nothing to do.
-                return "success"
-            else:
-                print("projects missing for cityPyo user", cityPyo_user)
+        # retrieve infrared projects from cache
+        infrared_projects = find_infrared_projects_in_cache(cityPyo_user)
+        if check_infrared_projects_still_exist(infrared_projects):
+            # projects still exist, nothing to do.
+            return "success"
+        else:
+            print("projects missing for cityPyo user", cityPyo_user)
     
     except Exception as e:
         print("Exception occured when checking for projects. ", e)
@@ -102,20 +111,13 @@ def process_task():
 
     #wind_scenario["result_type"] = "wind"  # TODO make route for sun, ...
 
-    are_projects_in_cache = False
-    infrared_projects = []
     # Parse requests
     try:
-        group_task_projects_creation = tasks.find_group_task_for_infrared_project_creation.delay(city_pyo_user_id)
-        if group_task_projects_creation:
-            # retrieve infrared projects from cache
-            are_projects_in_cache = True
-            infrared_projects = get_infrared_projects_from_group_task(group_task_projects_creation)
-        
-        # check if projects are cached and still exist. Otherwise recreate them at endpoint.
-        if not (are_projects_in_cache and check_infrared_projects_still_exist(infrared_projects)):
-            group_task_projects_creation = tasks.setup_infrared_projects_for_cityPyo_user.delay(city_pyo_user_id)
-            infrared_projects = get_infrared_projects_from_group_task(group_task_projects_creation)
+        infrared_projects = find_infrared_projects_in_cache(city_pyo_user_id)        
+        if not check_infrared_projects_still_exist(infrared_projects):
+            # check if projects are cached and still exist. Otherwise recreate them at endpoint.
+            group_task_id_projects_creation = tasks.setup_infrared_projects_for_cityPyo_user.delay(city_pyo_user_id)
+            infrared_projects = get_infrared_projects_from_group_task(group_task_id_projects_creation)
 
         single_result = tasks.compute_task.delay(*get_calculation_input(request.json), infrared_projects)
         response = {'taskId': single_result.id}
@@ -128,12 +130,17 @@ def process_task():
         )
     except KeyError:
         return bad_request("Payload not correctly structured.")
+    except Exception:
+        return bad_request("Exception found")
+
 
 
 @app.route("/grouptasks/<grouptask_id>", methods=['GET'])
 def get_grouptask(grouptask_id: str):
     group_result = GroupResult.restore(grouptask_id, app=celery_app)
+    
     result_array = [result.get() for result in group_result.results if result.ready()]
+
 
     if result_array:
         results = summarize_multiple_geojsons_to_one([result["geojson"] for result in result_array])
