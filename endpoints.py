@@ -53,16 +53,17 @@ def find_result_in_cache(request_json):
         return None
 
 
-# tries to find infrafred project setup in cache, otherwise returns None
+# tries to find infrafred project setup in cache and, otherwise returns None
 def find_infrared_projects_in_cache(cityPyo_user):
     try:
         group_task_projects_creation = tasks.get_project_setup_from_cache.delay(cityPyo_user)
         infrared_projects = get_infrared_projects_from_group_task(group_task_projects_creation)
-        infrared_projects.get() # test if the task result can be restored
 
+        print("Infrared projects found in cage", [ip["project_uuid"] for ip in infrared_projects])
         return infrared_projects
     
-    except Exception:
+    except Exception as e:
+        print(e)
         print("Infrafred Project setup for cityPyo User not in cache")
         return None
     
@@ -158,8 +159,6 @@ def get_grouptask(grouptask_id: str):
     group_result = GroupResult.restore(grouptask_id, app=celery_app)
     
     result_array = [result.get() for result in group_result.results if result.ready()]
-
-
     if result_array:
         results = summarize_multiple_geojsons_to_one([result["geojson"] for result in result_array])
     else:
