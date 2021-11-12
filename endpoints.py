@@ -41,31 +41,46 @@ def bad_request(exception:  werkzeug.exceptions.BadRequest):
 
 
 # tries to find the calculation result in cache, otherwise returns None
-def find_result_in_cache(request_json):
+def find_calc_task_in_cache(request_json):
     try:
-        result = tasks.get_result_from_cache.delay(*get_calculation_input(request_json, hashes_only=True))
-        result.get()  # test if result can be restored        
-        print("found result in cache!")
-        return result
-    
+        calc_task = tasks.get_result_from_cache.delay(*get_calculation_input(request_json, hashes_only=True))
     except Exception:
         print("Result not yet in cache")
+        return None  
+
+    print("found group task for calculation in cache. Task ID", calc_task.id)
+    # test if result can be restored        
+    try:
+        async_result = AsyncResult(calc_task.id, app=celery_app)
+        group_result = GroupResult.restore(async_result.get(), app=celery_app)
+        result_array = [result.get() for result in group_result.results if result.ready()]
+    except Exception as e:
+        print("Obtaining results from cache caused error.", e)
         return None
+    
+    # return calc task
+    print("found result in cache!")
+    return calc_task
+    
+    
 
 
 # tries to find infrafred project setup in cache and, otherwise returns None
 def find_infrared_projects_in_cache(cityPyo_user):
     try:
         group_task_projects_creation = tasks.get_project_setup_from_cache.delay(cityPyo_user)
-        infrared_projects = get_infrared_projects_from_group_task(group_task_projects_creation)
-
-        print("Infrared projects found in cage", [ip["project_uuid"] for ip in infrared_projects])
-        return infrared_projects
-    
-    except Exception as e:
-        print(e)
+    except:
         print("Infrafred Project setup for cityPyo User not in cache")
         return None
+    
+    try:
+        infrared_projects = get_infrared_projects_from_group_task(group_task_projects_creation)
+    except:
+        print("Obtaining results from cache caused error.")
+        return None
+        
+    print("Infrared projects found in cache", [ip["project_uuid"] for ip in infrared_projects])
+    return infrared_projects
     
 
 @app.route("/check_projects_for_user", methods=["POST"])
@@ -128,8 +143,9 @@ def process_task():
     #wind_scenario["result_type"] = "wind"  # TODO make route for sun, ...
 
     # Parse requests
-    result = find_result_in_cache(request.json)
-    if not result:
+    calc_task = find_calc_task_in_cache(request.json)
+    
+    if not calc_task:
         try:
             # check if projects are cached and still exist. Otherwise recreate them at endpoint.
             infrared_projects = find_infrared_projects_in_cache(city_pyo_user_id)        
@@ -138,12 +154,12 @@ def process_task():
                 infrared_projects = get_infrared_projects_from_group_task(group_task_id_projects_creation)
 
             # compute result
-            result = tasks.compute_task.delay(*get_calculation_input(request.json), infrared_projects)
+            calc_task = tasks.compute_task.delay(*get_calculation_input(request.json), infrared_projects)
         
         except Exception as e:
             abort(500, e)
     
-    response = {'taskId': result.id}
+    response = {'taskId': calc_task.id}
     print("response returned ", response)
 
     # return jsonify(response), HTTPStatus.OK
