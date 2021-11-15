@@ -50,7 +50,7 @@ def get_buildings_for_bbox(bbox:Polygon, buildings_gdf: GeoDataFrame) -> list:
     sw_x, sw_y = get_south_west_corner_coords_of_bbox(bbox) # south west corner for bbox, as utm.
 
     intersection_polygons = buildings_gdf.intersection(bbox)  # GeoSeries with all intersection polygons bbox<->building
-    intersection_polygons = intersection_polygons.translate(-sw_x, -sw_y)  # translate to local coordinates
+    intersection_polygons = intersection_polygons.translate(-sw_x, -sw_y)  # translate to local coordinates from a 0,0 origin
 
     intersections = buildings_gdf.copy()  # copy buildings dataframe with all properties
     intersections.geometry = intersection_polygons # replace geometry with the building intersections

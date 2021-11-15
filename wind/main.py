@@ -60,7 +60,7 @@ def create_infrared_user_from_json(infrared_user_json):
     )
     
 
-def create_infrared_project_from_json(infrared_project_json):
+def recreate_infrared_project_from_json(infrared_project_json, update_buildings=True):
     # locally recreate InfraredUser, to handle communication with the Infrared endpoint
     infrared_user = create_infrared_user_from_json(
         {
@@ -72,12 +72,14 @@ def create_infrared_project_from_json(infrared_project_json):
     # locally recreate infrared project, in order to use result formatting logic
     infrared_project = InfraredProject(
             infrared_user, 
+            infrared_project_json["cityPyo_user"], 
             infrared_project_json["name"], 
             Polygon(infrared_project_json["bbox_coords"]),
             infrared_project_json["resolution"],
             infrared_project_json["buffer"],
             infrared_project_json["snapshot_uuid"],
-            infrared_project_json["project_uuid"]
+            infrared_project_json["project_uuid"],
+            update_buildings_at_endpoint=update_buildings
             )
 
     return infrared_project
@@ -98,29 +100,32 @@ def create_infrared_project_for_bbox_and_user(infrared_user_json: dict, user_id:
        "bbox": Polygon(bbox_coords),
     }
     # create missing projects at AIT endpoint
-    infrared_project = InfraredProject(infrared_user, project["projectName"], project["bbox"], analysis_resolution, bbox_buffer)
+    infrared_project = InfraredProject(
+        infrared_user, 
+        user_id,
+        project["projectName"], 
+        project["bbox"], 
+        analysis_resolution, 
+        bbox_buffer, 
+        update_buildings_at_endpoint=True
+    )
            
     return infrared_project.export_to_json()
 
 
 # trigger calculation at AIT endpoint for a infrared_project with given scenario settings and buildings [geojson]
 def start_calculation_for_project(scenario: dict, buildings: dict, infrared_project_json: dict):
-    infrared_project = create_infrared_project_from_json(infrared_project_json)
+    infrared_project = recreate_infrared_project_from_json(infrared_project_json, update_buildings=True)
     
     print("scenario", scenario)
-    
     scenario = ScenarioParams(scenario)
     
-    print("preparing inputs for project %s" %infrared_project.name)
-    # prepare inputs
-    update_buildings_for_infrared_project(infrared_project, buildings)
-
     return infrared_project.trigger_calculation_at_endpoint_for(scenario)
 
 
 # collects the result of a triggered calculation
 def collect_result_for_project(result_uuid: str, infrared_project_json: dict):
-    infrared_project = create_infrared_project_from_json(infrared_project_json)
+    infrared_project = recreate_infrared_project_from_json(infrared_project_json, update_buildings=False)
     infrared_project.download_result_and_crop_to_roi(result_uuid)
     geojson = convert_tif_to_geojson(infrared_project.result_geotif)
 

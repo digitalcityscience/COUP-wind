@@ -4,8 +4,8 @@ import time
 from shapely.ops import transform
 from shapely.geometry import Polygon
 
-from wind.data import export_result_to_geotif, clip_geotif_with_geodf, get_south_west_corner_coords_of_bbox, \
-    get_bounds_for_geotif, transformer_to_wgs, get_bbox_size, get_value
+from wind.data import export_result_to_geotif, clip_geotif_with_geodf, get_buildings_for_bbox, get_south_west_corner_coords_of_bbox, \
+    get_bounds_for_geotif, make_gdf_from_geojson, transformer_to_wgs, get_bbox_size, get_value
 import wind.queries
 from wind.queries import make_query
 from wind.infrared_user import InfraredUser
@@ -20,15 +20,19 @@ class InfraredProject:
     def __init__(
             self,
             user: InfraredUser,
-            name,
+            cityPyo_user: str,
+            name: str,
             bbox_utm: Polygon,
             resolution,
             bbox_buffer,
             snapshot_uuid=None,
             project_uuid=None,
+            update_buildings_at_endpoint=True
     ):
+
         # set properties
         self.user = user
+        self.cityPyo_user = cityPyo_user
         self.name = name
         self.project_uuid = project_uuid
         self.snapshot_uuid = snapshot_uuid
@@ -46,7 +50,7 @@ class InfraredProject:
         self.bbox_sw_corner_wgs = get_south_west_corner_coords_of_bbox(self.buffered_bbox_wgs)
 
         # input placeholders
-        self.buildings = {}
+        self.building_count = 0
         self.wind_speed = None
         self.wind_direction = None
         
@@ -62,6 +66,10 @@ class InfraredProject:
             self.create_new_project()
             self.get_root_snapshot_id()
             self.delete_osm_geometries()
+        
+        # udpate the buildings at the endpoint
+        if update_buildings_at_endpoint: 
+            self.update_buildings()
 
     """ Project Creation """
     
@@ -108,6 +116,7 @@ class InfraredProject:
     # exports project to json , so it can be serialized
     def export_to_json(self):
         return {
+            "cityPyo_user": self.cityPyo_user,
             "name": self.name,
             "bbox_coords": list(self.bbox_utm.exterior.coords),
             "resolution": self.analysis_grid_resolution,
@@ -118,7 +127,8 @@ class InfraredProject:
             "infrared_client": {
                 "uuid": self.user.uuid,
                 "token": self.user.token,
-            }
+            }, 
+            "building_count": self.building_count
         }
 
 
@@ -139,7 +149,7 @@ class InfraredProject:
         return any(self.gdf_result_roi.intersects(self.bbox_utm))
 
 
-    def get_all_buildings(self):
+    def get_all_buildings_at_endpoint(self):
         snapshot_geometries = make_query(
             wind.queries.get_geometry_objects_in_snapshot_query(self.snapshot_uuid),
             self.user
@@ -153,7 +163,6 @@ class InfraredProject:
             print("could not get buildings")
             return {}
         
-        self.buildings = buildings
 
         return buildings
 
@@ -211,10 +220,22 @@ class InfraredProject:
 
     """ Project Updates """
 
-    # updates all buildings in bbox
-    def update_buildings(self, buildings_in_bbox: dict):
+    # updates all buildings at endpoint to match buildings at cityPyo (for all buildings in bbox)
+    def update_buildings(self):
+        print(f"updating buildings for project {self.name}")
+
+        # get current building geojson from cityPyo
+        cityPyo_buildings = cityPyo.get_buildings_for_user(self.cityPyo_user)
+        buildings_gdf = make_gdf_from_geojson(cityPyo_buildings)
+        if buildings_gdf.crs != "EPSG:25832":
+            buildings_gdf = buildings_gdf.to_crs("EPSG:25832")
+
+        # get buildings in this bbox that should be mirrored to endpoint
+        buildings_in_bbox = get_buildings_for_bbox(self.buffered_bbox_utm, buildings_gdf)
+        self.building_count = len(buildings_in_bbox)
+
         # get the buildings currently saved for project at endpoint
-        buildings_at_endpoint = self.get_all_buildings()
+        buildings_at_endpoint = self.get_all_buildings_at_endpoint()
 
         # delete any outdated buildings first
         buildings_to_delete = []
@@ -227,7 +248,7 @@ class InfraredProject:
         buildings_to_create = []
         # add or update buildings in bbox if changed
         for city_io_bld in buildings_in_bbox:
-            if city_io_bld in self.buildings.values():
+            if city_io_bld in buildings_at_endpoint.values():
                 # building already exists and did not update
                 continue
 
@@ -243,7 +264,6 @@ class InfraredProject:
 
     def delete_building(self, building_uuid):
         make_query(wind.queries.delete_building(self.snapshot_uuid, building_uuid), self.user)
-        del self.buildings[building_uuid]
 
 
     def create_new_building(self, new_building):
@@ -253,8 +273,6 @@ class InfraredProject:
         if not uuid:
             print("could not create building!")
             self.create_new_building(new_building)
-
-        self.buildings[uuid] = new_building
 
 
     """ Project Result Handling"""
