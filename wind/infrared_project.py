@@ -1,11 +1,13 @@
 import os
 import time
+import json
 
 from shapely.ops import transform
 from shapely.geometry import Polygon
+import geopandas
 
-from wind.data import export_result_to_geotif, clip_geotif_with_geodf, get_buildings_for_bbox, get_south_west_corner_coords_of_bbox, \
-    get_bounds_for_geotif, make_gdf_from_geojson, transformer_to_wgs, get_bbox_size, get_value
+from wind.data import convert_tif_to_geojson, export_result_to_geotif, get_buildings_for_bbox, get_project_area_as_gdf, get_south_west_corner_coords_of_bbox, \
+    make_gdf_from_geojson, transformer_to_wgs, get_bbox_size, get_value
 import wind.queries
 from wind.queries import make_query
 from wind.infrared_user import InfraredUser
@@ -39,7 +41,7 @@ class InfraredProject:
 
         # set bbox properties
         self.bbox_utm  = bbox_utm
-        self.bbbox_wgs = transform(transformer_to_wgs, bbox_utm)
+        self.bbox_wgs = transform(transformer_to_wgs, bbox_utm)
 
         self.bbox_buffer = bbox_buffer
         self.buffered_bbox_utm = bbox_utm.buffer(bbox_buffer, cap_style=3).exterior.envelope
@@ -55,10 +57,8 @@ class InfraredProject:
         self.wind_direction = None
         
         # result placeholders
-        self.gdf_result_roi = None
+        self.gdf_result_roi = get_project_area_as_gdf(self.cityPyo_user)  # project area could be replaced with a custom ROI
         self.result_uuid = None
-        self.raw_result = None
-        self.result_geotif = None
         
 
         # init the project at endpoint if not existing yet
@@ -307,7 +307,7 @@ class InfraredProject:
 
 
     # waits for the result to be avaible. Then crops it to the area of interest.
-    def download_result_and_crop_to_roi(self, result_uuid) -> dict:
+    def get_result(self, result_uuid) -> dict:
         tries = 0
         max_tries = 100
         response = make_query(wind.queries.get_analysis_output_query(result_uuid, self.snapshot_uuid), self.user)
@@ -324,59 +324,35 @@ class InfraredProject:
                            "projects", self.project_uuid, "snapshots", self.snapshot_uuid, "analysisOutputs",
                            result_uuid]
             )
-
-            # update result, after cropping to roi
-            self.crop_result_data_to_roi(result)
-            return result
+            return self.get_result_as_geojson(result)
         else:
-            return {}
+            raise Exception("Could not get analysis_output from AIT", result_uuid)
+    
+    
+    """ 
+    **** Result conversion and cropping ****
+    """
+    # private
+    def get_result_as_geojson(self, raw_result):
+        tmp_geotif_raw_result = self.convert_result_to_geotif(raw_result, self.buffered_bbox_utm)
+        geojson_raw_result = convert_tif_to_geojson(tmp_geotif_raw_result)
+        
+        return self.remove_buffer_from_result_then_clip_to_roi(geojson_raw_result)
 
     # private
-    def crop_result_data_to_roi(self, result):
-        if self.buffered_bbox_utm is not self.bbox_utm:  # bbox is buffered
-            import geopandas
-            # create a tif with the buffered bbox containing all data.
-            geo_tif_path = self.save_result_as_geotif(result, self.buffered_bbox_utm)  # export as tif, so it can be cropped
-            # create a gdf of the unbuffered bbox. To clip to this.
-            bbox_gdf = geopandas.GeoDataFrame([self.bbox_utm], columns=["geometry"])
-            # clip the result twice: Remove buffer from bbox, then clip to roi
-            result["analysisOutputData"] = clip_geotif_with_geodf(geo_tif_path, [bbox_gdf, self.gdf_result_roi])
-
-        else:  # bbox is not buffered
-            # export as tif, so it can be cropped
-            geo_tif_path = self.save_result_as_geotif(result, self.bbox_utm)
-            # BBOX is not buffered. No need to remove buffer
-            result["analysisOutputData"] = clip_geotif_with_geodf(geo_tif_path, [self.gdf_result_roi])
-
-
-    # TODO private
-    def save_result_as_geotif(self, result, bbox):
+    def convert_result_to_geotif(self, result, bbox):
         # save result as geotif so it can be easily cropped to roi
         geo_tif_path = export_result_to_geotif(result["analysisOutputData"], bbox, self.name)
-        self.result_geotif = geo_tif_path
         
         return geo_tif_path
 
+    # private
+    def remove_buffer_from_result_then_clip_to_roi(self, input_geojson):
+        # create a gdf of the unbuffered bbox. To clip to this.
+        bbox_gdf = geopandas.GeoDataFrame([self.bbox_wgs], columns=["geometry"], crs='EPSG:4326')
+        # remove bbox buffer
+        clipped_gdf = geopandas.clip(make_gdf_from_geojson(input_geojson), bbox_gdf)
+        # clip to ROI
+        clipped_gdf = geopandas.clip(clipped_gdf, self.gdf_result_roi.to_crs('EPSG:4326'))
 
-    def get_bounds_of_geotif_bounds(self, projection='utm'):
-        import rasterio
-        dataset = rasterio.open(self.result_geotif)
-
-        # BoundingBox(left=358485.0, bottom=4028985.0, right=590415.0, top=4265115.0)
-        left, bottom, right, top = get_bounds_for_geotif(self.result_geotif)
-        boundsPoly = Polygon([
-            [left, bottom],
-            [right, bottom],
-            [right, top],
-            [left, top],
-            [left, bottom]
-        ]
-        )
-
-        if projection == "utm":
-            return boundsPoly
-
-        if projection == "wgs":
-            return transform(transformer_to_wgs, boundsPoly)
-
-        raise NotImplementedError
+        return json.loads(clipped_gdf.to_json())

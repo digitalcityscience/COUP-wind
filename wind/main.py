@@ -118,6 +118,7 @@ def start_calculation_for_project(scenario: dict, buildings: dict, infrared_proj
     infrared_project = recreate_infrared_project_from_json(infrared_project_json, update_buildings=True)
     
     print("scenario", scenario)
+    print("building_count", infrared_project.building_count)
     scenario = ScenarioParams(scenario)
     
     return infrared_project.trigger_calculation_at_endpoint_for(scenario)
@@ -126,10 +127,9 @@ def start_calculation_for_project(scenario: dict, buildings: dict, infrared_proj
 # collects the result of a triggered calculation
 def collect_result_for_project(result_uuid: str, infrared_project_json: dict):
     infrared_project = recreate_infrared_project_from_json(infrared_project_json, update_buildings=False)
-    infrared_project.download_result_and_crop_to_roi(result_uuid)
-    geojson = convert_tif_to_geojson(infrared_project.result_geotif)
-
     # download and return result
+    geojson = infrared_project.get_result(result_uuid)
+
     return {
         "geojson": geojson,
         "infrared_project_json": infrared_project_json

@@ -24,7 +24,7 @@ services:
       - INFRARED_URL=http://ait-mock-api:5555/
       - INFRARED_USERNAME=test
       - INFRARED_PASSWORD=test
-      - CITY_PYO=https://api.hcu-dev.de/citypyo
+      - CITY_PYO=https://api.hcu-dev.de/citypyo/
 
   worker:
     build:
@@ -38,7 +38,7 @@ services:
       - INFRARED_URL=http://ait-mock-api:5555/
       - INFRARED_USERNAME=test
       - INFRARED_PASSWORD=test
-      - CITY_PYO=https://api.hcu-dev.de/citypyo
+      - CITY_PYO=https://api.hcu-dev.de/citypyo/
 
   # run your own ait-mock-api for fast local debugging        
   ait-mock-api:
@@ -47,4 +47,4 @@ services:
     ports:
       - 5555:5000
     restart: "always"
-    command: python wind/mock_ait_api.py
+    command: python wind/mock-api/mock_ait_api.py

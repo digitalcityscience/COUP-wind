@@ -212,40 +212,6 @@ def export_result_to_geotif(values, bbox_utm, project_name) -> str:
     return file_path
 
 
-# uses the result as geotif and a geodataframe to clip the results to the area of interest
-def clip_geotif_with_geodf(tif_path, gdfs_to_clip_to: List[geopandas.GeoDataFrame]):
-    xds = rioxarray.open_rasterio(tif_path)
-
-    try:
-        for gdf in gdfs_to_clip_to:
-            if isinstance(gdf, geopandas.GeoDataFrame):
-                xds = xds.rio.clip(gdf.geometry, gdf.crs, drop=True, invert=False)
-
-        xds.rio.to_raster(tif_path, tiled=True, dtype="float32")  # save new geotif
-
-    except NoRioDataException as e:
-        # clip throws exception if data and roi do not overlap.
-        # return no data in that case.
-
-        # Todo: replace tif with empty tif
-        return []
-
-    # ensure right shape for result
-    data = xds.data
-    while (len(np.array(data).shape)) > 2:
-        # sometimes the dataset gets wrapped into an extra dimension
-        data = data[0]
-
-    return data.tolist()
-
-# returns coords of bounding box
-# BoundingBox(left=358485.0, bottom=4028985.0, right=590415.0, top=4265115.0)
-def get_bounds_for_geotif(tif_path):
-    dataset = rasterio.open(tif_path)
-
-    return dataset.bounds
-
-
 # converts tif to geojson and returns feature array
 def convert_tif_to_geojson(tif_path) -> List[dict]:
     features = []
