@@ -111,7 +111,7 @@ def compute_task(
                 trigger_calculation.s(scenario, buildings, project), # returns result_uuid
                 collect_infrared_result.s(project) # collect_result will result_uuid as first argument
                 ) 
-            for project in sorted(infrared_projects, key=lambda d: d['building_count'], reverse=True) # sort projects by building count
+            for project in sorted(infrared_projects, key=lambda d: d['building_count'], reverse=False) # sort projects by building count
         ]
     )
     
