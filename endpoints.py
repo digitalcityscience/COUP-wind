@@ -9,15 +9,46 @@ from flask_cors import CORS
 
 import tasks
 from mycelery import app as celery_app
+from flask_cors import CORS
+from flask_compress import Compress
+from flask_httpauth import HTTPBasicAuth
+import werkzeug
+from werkzeug.security import generate_password_hash, check_password_hash
+
+import os
+
 from services import check_infrared_projects_still_exist, get_calculation_input, get_infrared_projects_from_group_task
 from wind.data import summarize_multiple_geojsons_to_one
 from wind.wind_scenario_params import ScenarioParams
+
 
 app = Flask(__name__)
 CORS(app)
 app.config['CORS_HEADERS'] = 'Content-Type'
 Compress(app)
 
+auth = HTTPBasicAuth()
+
+CLIENT_ID = os.getenv('CLIENT_ID')
+CLIENT_PASSWORD = os.getenv('CLIENT_PASSWORD')
+
+pw_hashes = {
+    CLIENT_ID: generate_password_hash(CLIENT_PASSWORD)
+}
+
+@auth.verify_password
+def verify_password(client_id, password):
+    if client_id in pw_hashes and \
+            check_password_hash(pw_hashes.get(client_id), password):
+        return client_id
+
+
+@auth.error_handler
+def auth_error(status):
+    return make_response(
+        jsonify({'error': 'Access denied.'}),
+        status
+    )
 
 @app.errorhandler(werkzeug.exceptions.NotFound)
 def not_found(exception: werkzeug.exceptions.NotFound):
@@ -124,6 +155,7 @@ def check_projects_for_user():
 
 
 @app.route("/windtask", methods=["POST"])
+@auth.login_required
 def process_task():
     # Validate request
     if not request.json:
@@ -167,6 +199,7 @@ def process_task():
 
 
 @app.route("/grouptasks/<grouptask_id>", methods=['GET'])
+@auth.login_required
 def get_grouptask(grouptask_id: str):
     a = time.time()
     group_result = GroupResult.restore(grouptask_id, app=celery_app)
@@ -206,6 +239,7 @@ def get_grouptask(grouptask_id: str):
 
 
 @app.route("/tasks/<task_id>", methods=['GET'])
+@auth.login_required
 def get_task(task_id: str):
     print("looking for results of this id", task_id)
     async_result = AsyncResult(task_id, app=celery_app)
