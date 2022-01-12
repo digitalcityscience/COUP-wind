@@ -1,21 +1,25 @@
+import time
 from http import HTTPStatus
-from wind.data import summarize_multiple_geojsons_to_one
-from services import check_infrared_projects_still_exist, get_calculation_input, get_infrared_projects_from_group_task
-from wind.wind_scenario_params import ScenarioParams
 
+import werkzeug
 from celery.result import AsyncResult, GroupResult
 from flask import Flask, request, abort, make_response, jsonify
+from flask_compress import Compress
+from flask_cors import CORS
 
 import tasks
 from mycelery import app as celery_app
-import werkzeug
 from flask_cors import CORS
 from flask_compress import Compress
-
 from flask_httpauth import HTTPBasicAuth
+import werkzeug
 from werkzeug.security import generate_password_hash, check_password_hash
 
 import os
+
+from services import check_infrared_projects_still_exist, get_calculation_input, get_infrared_projects_from_group_task
+from wind.data import summarize_multiple_geojsons_to_one
+from wind.wind_scenario_params import ScenarioParams
 
 
 app = Flask(__name__)
@@ -48,19 +52,18 @@ def auth_error(status):
 
 @app.errorhandler(werkzeug.exceptions.NotFound)
 def not_found(exception: werkzeug.exceptions.NotFound):
-
     return make_response(
         jsonify({'error': "Could not find the requested url"}),
         404
     )
 
 
-@app.errorhandler( werkzeug.exceptions.BadRequest)
-def bad_request(exception:  werkzeug.exceptions.BadRequest):
+@app.errorhandler(werkzeug.exceptions.BadRequest)
+def bad_request(exception: werkzeug.exceptions.BadRequest):
     message = str(exception)
 
     print("this is the exception", message)
-    
+
     return make_response(
         jsonify({'error': message}),
         400
@@ -73,7 +76,7 @@ def find_calc_task_in_cache(request_json):
         calc_task = tasks.get_result_from_cache.delay(*get_calculation_input(request_json, hashes_only=True))
     except Exception:
         print("Result not yet in cache")
-        return None  
+        return None
 
     print("found group task for calculation in cache. Task ID", calc_task.id)
     # test if result can be restored        
@@ -84,12 +87,10 @@ def find_calc_task_in_cache(request_json):
     except Exception as e:
         print("Obtaining results from cache caused error.", e)
         return None
-    
+
     # return calc task
     print("found result in cache!")
     return calc_task
-    
-    
 
 
 # tries to find infrafred project setup in cache and, otherwise returns None
@@ -99,28 +100,28 @@ def find_infrared_projects_in_cache(cityPyo_user):
     except:
         print("Infrafred Project setup for cityPyo User not in cache")
         return None
-    
+
     try:
         infrared_projects = get_infrared_projects_from_group_task(group_task_projects_creation)
     except:
         print("Obtaining results from cache caused error.")
         return None
-        
+
     print("Infrared projects found in cache", [ip["project_uuid"] for ip in infrared_projects])
     return infrared_projects
-    
+
 
 @app.route("/check_projects_for_user", methods=["POST"])
 def check_projects_for_user():
     if not request.json:
         print("no request json.")
         abort(400)
-    
+
     check_successful = False
     cityPyo_user = request.json["city_pyo_user"]
     print("checking project status at AIT for user ", cityPyo_user)
-    
-    try: 
+
+    try:
         # retrieve infrared projects from cache
         infrared_projects = find_infrared_projects_in_cache(cityPyo_user)
         if check_infrared_projects_still_exist(infrared_projects):
@@ -128,30 +129,30 @@ def check_projects_for_user():
             return "success"
         else:
             print("projects missing for cityPyo user", cityPyo_user)
-    
+
     except Exception as e:
         print("Exception occured when checking for projects. ", e)
-        print("Trying to reset now")    
-    
-    # try to recreate the projects and check again if projects at endpoint and local are the same.
+        print("Trying to reset now")
+
+        # try to recreate the projects and check again if projects at endpoint and local are the same.
     try:
         recreation_group_task = tasks.setup_infrared_projects_for_cityPyo_user.delay(user_id=cityPyo_user)
         infrared_projects = get_infrared_projects_from_group_task(recreation_group_task)
         check_successful = check_infrared_projects_still_exist(infrared_projects)
     except Exception as e:
-            print("Failed for cityPyo user ", cityPyo_user)
-            print("cannot check if projects exist. There might be a general error: ", e)
-            abort(500)
+        print("Failed for cityPyo user ", cityPyo_user)
+        print("cannot check if projects exist. There might be a general error: ", e)
+        abort(500)
 
     if not check_successful:
         print("check for projects failed failed")
         print("these projects should exist")
         print(get_infrared_projects_from_group_task(recreation_group_task))
         abort(500)
-        
+
     if check_successful:
         return "success"
-        
+
 
 @app.route("/windtask", methods=["POST"])
 @auth.login_required
@@ -166,27 +167,27 @@ def process_task():
     except KeyError as missing_arg:
         abort(400, "Bad Request. Missing argument: %s" % missing_arg)
     except Exception as e:
-        abort(400, "Bad Request. Exception: %s" %e)
+        abort(400, "Bad Request. Exception: %s" % e)
 
-    #wind_scenario["result_type"] = "wind"  # TODO make route for sun, ...
+    # wind_scenario["result_type"] = "wind"  # TODO make route for sun, ...
 
     # Parse requests
     calc_task = find_calc_task_in_cache(request.json)
-    
+
     if not calc_task:
         try:
             # check if projects are cached and still exist. Otherwise recreate them at endpoint.
-            infrared_projects = find_infrared_projects_in_cache(city_pyo_user_id)        
+            infrared_projects = find_infrared_projects_in_cache(city_pyo_user_id)
             if not check_infrared_projects_still_exist(infrared_projects):
                 group_task_id_projects_creation = tasks.setup_infrared_projects_for_cityPyo_user.delay(city_pyo_user_id)
                 infrared_projects = get_infrared_projects_from_group_task(group_task_id_projects_creation)
 
             # compute result
             calc_task = tasks.compute_task.delay(*get_calculation_input(request.json), infrared_projects)
-        
+
         except Exception as e:
             abort(500, e)
-    
+
     response = {'taskId': calc_task.id}
     print("response returned ", response)
 
@@ -194,25 +195,30 @@ def process_task():
     return make_response(
         jsonify(response),
         HTTPStatus.OK,
-    ) 
-
+    )
 
 
 @app.route("/grouptasks/<grouptask_id>", methods=['GET'])
 @auth.login_required
 def get_grouptask(grouptask_id: str):
+    a = time.time()
     group_result = GroupResult.restore(grouptask_id, app=celery_app)
-    
+    print(">> Get group_result obj: {}s".format(time.time() - a))
+
+    a = time.time()
     result_array = [result.get() for result in group_result.results if result.ready()]
+    print(">> Collecting results: {}s".format(time.time() - a))
     if result_array:
+        a = time.time()
         results = summarize_multiple_geojsons_to_one([result["geojson"] for result in result_array])
+        print(">> Summarize results: {}s".format(time.time() - a))
     else:
         # return empty geojson if no results
-        results ={
+        results = {
             "type": "FeatureCollection",
             "features": []
         }
-        
+
     # TODO format result here. geojson to png?
 
     # Fields available
@@ -255,7 +261,6 @@ def get_task(task_id: str):
         response,
         HTTPStatus.OK,
     )
-
 
 
 if __name__ == '__main__':
