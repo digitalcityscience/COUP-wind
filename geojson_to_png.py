@@ -29,7 +29,7 @@ def geojson_to_png(geojson, property_to_burn, resolution):
         for image_line in image_data
     ]
     # create a np array from image data
-    np_values = np.array(image_data, dtype="uint8")
+    np_values = np.array(image_data, dtype="float32")
 
     # create a pillow image, save it and convert to base64 string
     im = Image.fromarray(np_values)
