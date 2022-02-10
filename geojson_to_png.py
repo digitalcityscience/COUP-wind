@@ -25,11 +25,11 @@ def geojson_to_png(geojson, property_to_burn, resolution):
 
     # set NaN as 255
     image_data = [
-        [x if x and not math.isnan(x) else png_value_for_nan for x in image_line]
+        [int(x*10) if x and not math.isnan(x) else png_value_for_nan for x in image_line]
         for image_line in image_data
     ]
     # create a np array from image data
-    np_values = np.array(image_data, dtype="float32")
+    np_values = np.array(image_data, dtype="uint8")
 
     # create a pillow image, save it and convert to base64 string
     im = Image.fromarray(np_values)
