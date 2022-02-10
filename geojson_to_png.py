@@ -25,7 +25,7 @@ def geojson_to_png(geojson, property_to_burn, resolution):
 
     # set NaN as 255
     image_data = [
-        [int(x*10) if x and not math.isnan(x) else png_value_for_nan for x in image_line]
+        [int(x*10) if not math.isnan(x) else png_value_for_nan for x in image_line]
         for image_line in image_data
     ]
 
