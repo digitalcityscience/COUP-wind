@@ -5,6 +5,7 @@ import time
 
 from celery.result import GroupResult
 from mycelery import app as celery_app
+from geojson_to_png import format_result_as_png
 
 
 import wind.cityPyo as cp
@@ -13,6 +14,10 @@ from wind.infrared_user import InfraredUser
 
 cityPyo = cp.CityPyo() ## put cityPyo container here
 
+
+# gets a geojson and returns a result as png
+def get_png_result(geojson):
+    return format_result_as_png(geojson)
 
 
 def get_infrared_projects_from_group_task(group_task) -> list:

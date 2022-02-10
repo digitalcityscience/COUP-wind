@@ -17,7 +17,7 @@ from werkzeug.security import generate_password_hash, check_password_hash
 
 import os
 
-from services import check_infrared_projects_still_exist, get_calculation_input, get_infrared_projects_from_group_task
+from services import check_infrared_projects_still_exist, get_calculation_input, get_infrared_projects_from_group_task, get_png_result
 from wind.data import summarize_multiple_geojsons_to_one
 from wind.wind_scenario_params import ScenarioParams
 
@@ -201,17 +201,14 @@ def process_task():
 @app.route("/grouptasks/<grouptask_id>", methods=['GET'])
 @auth.login_required
 def get_grouptask(grouptask_id: str):
-    a = time.time()
-    group_result = GroupResult.restore(grouptask_id, app=celery_app)
-    print(">> Get group_result obj: {}s".format(time.time() - a))
+    request_args = request.args.to_dict()
+    result_format = request_args.get("result_format")
 
-    a = time.time()
+    group_result = GroupResult.restore(grouptask_id, app=celery_app)
     result_array = [result.get() for result in group_result.results if result.ready()]
-    print(">> Collecting results: {}s".format(time.time() - a))
+
     if result_array:
-        a = time.time()
         results = summarize_multiple_geojsons_to_one([result["geojson"] for result in result_array])
-        print(">> Summarize results: {}s".format(time.time() - a))
     else:
         # return empty geojson if no results
         results = {
@@ -219,7 +216,8 @@ def get_grouptask(grouptask_id: str):
             "features": []
         }
 
-    # TODO format result here. geojson to png?
+    if result_format == "png":
+        results = get_png_result(results)
 
     # Fields available
     # https://docs.celeryproject.org/en/stable/reference/celery.result.html#celery.result.ResultSet
