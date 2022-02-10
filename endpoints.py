@@ -217,6 +217,7 @@ def get_grouptask(grouptask_id: str):
         }
 
     if result_format == "png":
+        print("converting result to png")
         results = get_png_result(results)
 
     # Fields available
