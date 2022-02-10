@@ -28,8 +28,10 @@ def geojson_to_png(geojson, property_to_burn, resolution):
         [int(x*10) if x and not math.isnan(x) else png_value_for_nan for x in image_line]
         for image_line in image_data
     ]
+
     # create a np array from image data
     np_values = np.array(image_data, dtype="uint8")
+    print("unique values in image data ", np.unique(np_values))
 
     # create a pillow image, save it and convert to base64 string
     im = Image.fromarray(np_values)
