@@ -211,14 +211,14 @@ def get_grouptask(grouptask_id: str):
 
     if result_array:
         results = summarize_multiple_geojsons_to_one([result["geojson"] for result in result_array])
-    else:
+    elif result_format == "geojson":
         # return empty geojson if no results
         results = {
             "type": "FeatureCollection",
             "features": []
         }
 
-    if result_format == "png":
+    if results and result_format == "png":
         print("converting result to png")
         results = get_png_result(results)
 
