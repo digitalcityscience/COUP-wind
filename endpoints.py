@@ -204,6 +204,8 @@ def get_grouptask(grouptask_id: str):
     request_args = request.args.to_dict()
     result_format = request_args.get("result_format")
 
+    print(f"getting result. Group task id {grouptask_id} , result_format {result_format}")
+
     group_result = GroupResult.restore(grouptask_id, app=celery_app)
     result_array = [result.get() for result in group_result.results if result.ready()]
 
