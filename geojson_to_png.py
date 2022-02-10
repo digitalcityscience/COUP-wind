@@ -1,5 +1,4 @@
 import base64
-from noise_analysis import cityPyo as cp
 import os
 from geopandas.geodataframe import GeoDataFrame
 from geopandas.tools.clip import clip
