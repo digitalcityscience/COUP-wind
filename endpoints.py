@@ -17,7 +17,7 @@ from werkzeug.security import generate_password_hash, check_password_hash
 
 import os
 
-from services import check_infrared_projects_still_exist, get_calculation_input, get_infrared_projects_from_group_task, get_png_result
+from services import check_infrared_projects_still_exist, get_calculation_input, get_infrared_projects_from_group_task, convert_result_to_png
 from wind.data import summarize_multiple_geojsons_to_one
 from wind.wind_scenario_params import ScenarioParams
 
@@ -207,20 +207,23 @@ def get_grouptask(grouptask_id: str):
     print(f"getting result. Group task id {grouptask_id} , result_format {result_format}")
 
     group_result = GroupResult.restore(grouptask_id, app=celery_app)
-    result_array = [result.get() for result in group_result.results if result.ready()]
+    results = [result.get() for result in group_result.results if result.ready()]
 
-    if result_array:
-        results = summarize_multiple_geojsons_to_one([result["geojson"] for result in result_array])
-    elif result_format == "geojson":
-        # return empty geojson if no results
-        results = {
-            "type": "FeatureCollection",
-            "features": []
-        }
+    if results:
+        # first summarize the results into 1 geojson
+        results = summarize_multiple_geojsons_to_one([result["geojson"] for result in results])
+    
+        if result_format == "png":
+            print("converting result to png")
+            results = convert_result_to_png(results)
 
-    if results and result_format == "png":
-        print("converting result to png")
-        results = get_png_result(results)
+    else:
+        if result_format == "geojson":
+            # return empty geojson if no results
+            results = {
+                "type": "FeatureCollection",
+                "features": []
+            }
 
     # Fields available
     # https://docs.celeryproject.org/en/stable/reference/celery.result.html#celery.result.ResultSet

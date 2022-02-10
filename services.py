@@ -16,7 +16,7 @@ cityPyo = cp.CityPyo() ## put cityPyo container here
 
 
 # gets a geojson and returns a result as png
-def get_png_result(geojson):
+def convert_result_to_png(geojson):
     return format_result_as_png(geojson)
 
 
