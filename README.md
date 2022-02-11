@@ -103,13 +103,13 @@ Results are obtained through a 3 step process:
 ## Technical Setup
 In general this software is a wrapper around the Infrared AIT api.
 The software takes care of 
-    - subdividing the area of interest into 300m x 300m bboxes (projects) for calculation
-    - creation/updating of "projects" at Infrared. Each project contains a set of buildings and calculation of wind-comfort is run per project.
-    - translating geospatial data into the local coordinates and format of AIT projects 
-    - automated merging of results at bbox/project intersections
-    - converting of a project's result to geojson
-    - provision of result geojsons as png if requested
-    - keeping your projects at AIT api alive (by regular requests to them)
+- subdividing the area of interest into 300m x 300m bboxes (projects) for calculation
+- creation/updating of "projects" at Infrared. Each project contains a set of buildings and calculation of wind-comfort is run per project.
+- translating geospatial data into the local coordinates and format of AIT projects 
+- automated merging of results at bbox/project intersections
+- converting of a project's result to geojson
+- provision of result geojsons as png if requested
+- keeping your projects at AIT api alive (by regular requests to them)
 
 
 ### AIT api & mock api
@@ -118,7 +118,7 @@ The mock api mocks this behaviour and will always return the same mock result.
 
 # TODO
 ### caching
-### We'd just be a gateway, with some benefits (geojson in, geojson out, automated division of the area of interest into 300m x 300m bboxes for calculation, automated cleaning/merging of results at bbox intersections.) 
+#
 
 
 ## Celery
