@@ -97,9 +97,6 @@ Results are obtained through a 3 step process:
       - INFRARED_PASSWORD=test
       - CITY_PYO=https://api.hcu-dev.de/citypyo/
 
-
-# TO BE DESCRIBED
-
 ## Technical Setup
 In general this software is a wrapper around the Infrared AIT api.
 The software takes care of 
@@ -116,7 +113,8 @@ The software takes care of
 The AIT api is a GraphQL api which allows creation and updating of projects. Calculation of results per project.
 The mock api mocks this behaviour and will always return the same mock result.
 
-# TODO
+# TO BE DESCRIBED
+
 ### caching
 #
 
