@@ -61,22 +61,7 @@ Results are obtained through a 3 step process:
                 LAT,
                 LONG
             ],
-            [
-                LAT,
-                LONG
-            ],
-            [
-                LAT,
-                LONG
-            ],
-            [
-                LAT,
-                LONG
-            ],
-            [
-                LAT,
-                LONG
-            ]
+            ...,
         ],
         "bbox_sw_corner": [
             [
