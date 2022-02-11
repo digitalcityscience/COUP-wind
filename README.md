@@ -28,9 +28,11 @@ The returned normalised values represent categories as seen in the following tab
 Results are obtained through a 3 step process:
 - **Trigger a calculation**: POST Request to /windtask 
     - Params: 
+        ```
         - "wind_speed": INT ; [km/h] ;
         - "wind_direction": INT [0-360°] (0 being north, 90 east); 
         - "city_pyo_user": YOUR_CITYPYO_USER_ID  
+        ```
     - Returns the task id of the celery task:
         ```json { "taskId": __TASK_ID__ }
  - **Get result of the celery task**: GET Request to /tasks/__TASK_ID__
