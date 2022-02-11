@@ -34,7 +34,7 @@ Results are obtained through a 3 step process:
         - "city_pyo_user": YOUR_CITYPYO_USER_ID  
         ```
     - Returns the task id of the celery task:
-        ```json { "taskId": __TASK_ID__ }
+        ```json { "taskId": __TASK_ID__ } ```
  - **Get result of the celery task**: GET Request to /tasks/__TASK_ID__
     - Returns a group task id:
         ```json {"result": __GROUP_TASK_ID__ } ```
