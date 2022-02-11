@@ -40,7 +40,7 @@ Results are obtained through a 3 step process:
         ```json {"result": __GROUP_TASK_ID__ } ```
  - **Get result of the group task**: GET Request to /grouptasks/__GROUP_TASK_ID__
     - Param: 
-        - "result_format": "geojson" || "png" 
+        ``` "result_format": "geojson" || "png" ``` 
     - Returns the actual result, accompanied by some meta information on group task calculation progress.
       ``` {
             "results": { __RESULT_OBJECT__ },
@@ -49,9 +49,7 @@ Results are obtained through a 3 step process:
             "tasksTotal": 7
             }
         ```
-        
-             
-        
+            
         __RESULT_OBJECT__ for result_type "geojson":
         ``` { "results": {"type": "FeatureCollection", "features": [...] }}  ```
         
