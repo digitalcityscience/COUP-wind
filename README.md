@@ -32,29 +32,30 @@ Results are obtained through a 3 step process:
         - "wind_direction": INT [0-360°] (0 being north, 90 east); 
         - "city_pyo_user": YOUR_CITYPYO_USER_ID  
     - Returns the task id of the celery task:
-        > { "taskId": __TASK_ID__ }
+        ```json { "taskId": __TASK_ID__ }
  - **Get result of the celery task**: GET Request to /tasks/__TASK_ID__
     - Returns a group task id:
-        > {"result": __GROUP_TASK_ID__ }
+        ```json {"result": __GROUP_TASK_ID__ } ```
  - **Get result of the group task**: GET Request to /grouptasks/__GROUP_TASK_ID__
     - Param: 
         - "result_format": "geojson" || "png" 
     - Returns the actual result, accompanied by some meta information on group task calculation progress.
-      > {
+      ``` {
             "results": { __RESULT_OBJECT__ },
             "grouptaskProcessed": boolean,
             "tasksCompleted": 1,
             "tasksTotal": 7
-        }
+            }
+        ```
         
              
         
         __RESULT_OBJECT__ for result_type "geojson":
-        > "results": {"type": "FeatureCollection", "features": [...] }  
+        ``` { "results": {"type": "FeatureCollection", "features": [...] }}  ```
         
         __RESULT_OBJECT__ for result_type "png":
         
-        > "results": {
+        ``` "results": {
         "bbox_coordinates": [
             [
                 LAT,
@@ -86,13 +87,15 @@ Results are obtained through a 3 step process:
         "image_base64_string": "PNG_STRING",
         "img_height": PIXELS_Y,
         "img_width": PIXELS_X
-    },
+    } 
+    ```
 
 
 # RUN LOCALLY 
 - clone repo
-- Export ENV variables (see below)
 - create venv, install requirements
+
+- Export ENV variables (see below)
 - RUN _docker-compose up redis_ to start only the redis docker
 - Activate venv
 - RUN _celery -A tasks worker --loglevel=info --concurrency=8 -n worker4@%h_  
@@ -113,13 +116,27 @@ Results are obtained through a 3 step process:
 # TO BE DESCRIBED
 
 ## Technical Setup
+In general this software is a wrapper around the Infrared AIT api.
+The software takes care of 
+    - subdividing the area of interest into 300m x 300m bboxes (projects) for calculation
+    - creation/updating of "projects" at Infrared. Each project contains a set of buildings and calculation of wind-comfort is run per project.
+    - translating geospatial data into the local coordinates and format of AIT projects 
+    - automated merging of results at bbox/project intersections
+    - converting of a project's result to geojson
+    - provision of result geojsons as png if requested
+    - keeping your projects at AIT api alive (by regular requests to them)
+
 
 ### AIT api & mock api
+The AIT api is a GraphQL api which allows creation and updating of projects. Calculation of results per project.
+The mock api mocks this behaviour and will always return the same mock result.
+
+# TODO
 ### caching
 ### We'd just be a gateway, with some benefits (geojson in, geojson out, automated division of the area of interest into 300m x 300m bboxes for calculation, automated cleaning/merging of results at bbox intersections.) 
 
 
-
+## Celery
 This sample project shows how to use Celery to process task batches asynchronously. 
 For simplicity, the sum of two integers are computed here. In order to simulate the 
 complexity, a random duration (3-10 seconds are put on the processing).
