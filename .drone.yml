@@ -11,6 +11,7 @@ steps:
     tags:
       - ${DRONE_BRANCH}
     dockerfile: Dockerfile
+    custom_dns: ['192.168.8.5', '192.168.8.6']
     registry:
       from_secret: docker_registry
     username:
@@ -23,6 +24,7 @@ steps:
 
 - name: tag
   image: plugins/docker
+  custom_dns: ['192.168.8.5', '192.168.8.6']
   settings:
     repo:
       from_secret: docker_repository
