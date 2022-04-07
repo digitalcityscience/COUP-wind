@@ -23,7 +23,7 @@ steps:
     status: [ success ]
     branch: [ master ]
 
-- name: tag
+- name: build and publish release
   image: plugins/docker
   custom_dns: ['192.168.8.5', '192.168.8.6']
   settings:
@@ -45,7 +45,7 @@ steps:
   image: quving/drone-rancher-cicd:v1.1.0
   settings:
     stamp: ${DRONE_COMMIT}
-    kubectl_options: '-insecure-skip-tls-verify'
+    kubectl_options: '--insecure-skip-tls-verify'
     kubernetes_deployment: 'wind-api,wind-worker'
     kubernetes_namespace: ${DRONE_BRANCH}
     rancher_url:
