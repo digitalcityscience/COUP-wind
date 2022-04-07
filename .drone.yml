@@ -2,6 +2,7 @@
 kind: pipeline
 name: pipeline
 type: docker
+
 steps:
 - name: build and publish
   image: plugins/docker
@@ -40,11 +41,12 @@ steps:
     event:
       - tag
 
-- name: deploy
-  image: quving/drone-rancher-cicd:latest
+- name: rollout
+  image: quving/drone-rancher-cicd:v1.1.0
   settings:
     stamp: ${DRONE_COMMIT}
-    kubernetes_deployment: wind-api,wind-worker
+    kubectl_options: '-insecure-skip-tls-verify'
+    kubernetes_deployment: 'wind-api,wind-worker'
     kubernetes_namespace: ${DRONE_BRANCH}
     rancher_url:
       from_secret: rancher_url
