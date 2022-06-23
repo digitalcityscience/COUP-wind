@@ -1,25 +1,22 @@
-import time
-from http import HTTPStatus
+import os
 
-import werkzeug
-from celery.result import AsyncResult, GroupResult
 from flask import Flask, request, abort, make_response, jsonify
 from flask_compress import Compress
 from flask_cors import CORS
-
-import tasks
-from mycelery import app as celery_app
-from flask_cors import CORS
-from flask_compress import Compress
 from flask_httpauth import HTTPBasicAuth
+from http import HTTPStatus
+
+from mycelery import app as celery_app
+from celery.result import AsyncResult, GroupResult
+
 import werkzeug
 from werkzeug.security import generate_password_hash, check_password_hash
 
-import os
 
 from services import check_infrared_projects_still_exist, get_calculation_input, get_infrared_projects_from_group_task, convert_result_to_png
 from wind.data import summarize_multiple_geojsons_to_one
 from wind.wind_scenario_params import ScenarioParams
+import tasks
 
 
 app = Flask(__name__)
@@ -49,6 +46,7 @@ def auth_error(status):
         jsonify({'error': 'Access denied.'}),
         status
     )
+
 
 @app.errorhandler(werkzeug.exceptions.NotFound)
 def not_found(exception: werkzeug.exceptions.NotFound):
@@ -85,11 +83,10 @@ def find_calc_task_in_cache(request_json):
         group_result = GroupResult.restore(async_result.get(), app=celery_app)
         result_array = [result.get() for result in group_result.results if result.ready()]
     except Exception as e:
-        print("Obtaining results from cache caused error.", e)
+        print("But obtaining results from cache caused error.", e)
         return None
 
     # return calc task
-    print("found result in cache!")
     return calc_task
 
 
@@ -115,7 +112,7 @@ def find_infrared_projects_in_cache(cityPyo_user):
 def check_projects_for_user():
     if not request.json:
         print("no request json.")
-        abort(400)
+        abort(400, "No request.json")
 
     check_successful = False
     cityPyo_user = request.json["city_pyo_user"]
@@ -154,15 +151,15 @@ def check_projects_for_user():
         return "success"
 
 
-@app.route("/windtask", methods=["POST"])
+@app.post("/trigger_calculation")
 @auth.login_required
-def process_task():
+def trigger_calculation():
     # Validate request
     if not request.json:
         abort(400)
     try:
         # are all relevant params delivered?
-        wind_scenario = ScenarioParams(request.json, "wind")  # todo get wind from endpiont
+        __wind_scenario = ScenarioParams(request.json, "wind")  # todo get wind from endpiont
         city_pyo_user_id = request.json["city_pyo_user"]
     except KeyError as missing_arg:
         abort(400, "Bad Request. Missing argument: %s" % missing_arg)
@@ -171,43 +168,59 @@ def process_task():
 
     # wind_scenario["result_type"] = "wind"  # TODO make route for sun, ...
 
-    # Parse requests
     calc_task = find_calc_task_in_cache(request.json)
-
     if not calc_task:
         try:
             # check if projects are cached and still exist. Otherwise recreate them at endpoint.
             infrared_projects = find_infrared_projects_in_cache(city_pyo_user_id)
             if not check_infrared_projects_still_exist(infrared_projects):
-                group_task_id_projects_creation = tasks.setup_infrared_projects_for_cityPyo_user.delay(city_pyo_user_id)
-                infrared_projects = get_infrared_projects_from_group_task(group_task_id_projects_creation)
+                """
+                Trigger the recreation of projects at Infrared endpoint,
+                which takes several minutes.
+                Ask the user to try again in 5 min.
+                """
+                setup_task = tasks.setup_infrared_projects_for_cityPyo_user.delay(city_pyo_user_id)
+
+                abort(HTTPStatus.GATEWAY_TIMEOUT, (
+                    f"Setup in process. This may take several minutes. \n"
+                    f"Check with GET .../tasks/{ setup_task.id } if setup is ready. \n"
+                    f"Then repost your calculation request."
+                    )    
+                )
 
             # compute result
+            print("Sending calculation request to AIT Infrared.")
             calc_task = tasks.compute_task.delay(*get_calculation_input(request.json), infrared_projects)
 
         except Exception as e:
             abort(500, e)
 
-    response = {'taskId': calc_task.id}
-    print("response returned ", response)
-
-    # return jsonify(response), HTTPStatus.OK
+    group_task_id = calc_task.get()  # use group task id to get results of the calc_task.
+    response = {'groupTaskId': group_task_id}
+    
     return make_response(
         jsonify(response),
         HTTPStatus.OK,
     )
 
 
-@app.route("/grouptasks/<grouptask_id>", methods=['GET'])
+# route to collect results
+@app.route("/collect_results/<grouptask_id>", methods=['GET'])
 @auth.login_required
 def get_grouptask(grouptask_id: str):
+    """
+    Route to get results of group tasks.
+    Group tasks contain several sub-tasks.
+    Returns a result containing the result of all sub-tasks that are ready
+    """
     request_args = request.args.to_dict()
     result_format = request_args.get("result_format")
-
-    print(f"getting result. Group task id {grouptask_id} , result_format {result_format}")
+    print(f"Requested result of group task id {grouptask_id} , result_format {result_format}")
 
     group_result = GroupResult.restore(grouptask_id, app=celery_app)
     results = [result.get() for result in group_result.results if result.ready()]
+
+    print(f"{len(results)} of { len(group_result.results) } tasks ready.")
 
     if results:
         # first summarize the results into 1 geojson
@@ -242,12 +255,19 @@ def get_grouptask(grouptask_id: str):
     )
 
 
-@app.route("/tasks/<task_id>", methods=['GET'])
+
+@app.route("/check_on_singletask/<task_id>", methods=['GET'])
 @auth.login_required
 def get_task(task_id: str):
-    print("looking for results of this id", task_id)
-    async_result = AsyncResult(task_id, app=celery_app)
-    print(async_result)
+    """
+    This route is for debugging only.
+
+    Route to check status of single tasks.
+    Single tasks can be setup tasks or calculation tasks
+    Calculation tasks actually return a group task ID as "result".
+    This group task then contains the actual calculation results. 
+    """
+    async_result = AsyncResult(task_id, app=celery_app) # restore task
 
     # Fields available
     # https://docs.celeryproject.org/en/stable/reference/celery.result.html#celery.result.Result
@@ -258,7 +278,6 @@ def get_task(task_id: str):
         'resultReady': async_result.ready(),
     }
     if async_result.ready():
-        print(type(async_result.get()))
         response['result'] = async_result.get()
 
     return make_response(
@@ -268,4 +287,4 @@ def get_task(task_id: str):
 
 
 if __name__ == '__main__':
-    app.run(debug=True, host="0.0.0.0", port=5003)
+    app.run(debug=True, host="0.0.0.0", port=5004)
