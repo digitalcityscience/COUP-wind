@@ -11,8 +11,6 @@ import rasterio.warp
 from rasterio.transform import Affine
 
 import geopandas
-import rioxarray
-from rioxarray.exceptions import NoDataInBounds as NoRioDataException
 from pyproj import Transformer
 
 from wind.cityPyo import CityPyo
@@ -231,7 +229,7 @@ def convert_tif_to_geojson(tif_path) -> List[dict]:
             "type": "Feature",
             "geometry": geom,
             "properties": {"value": round(val, 1)}
-        }
+        }   
         # append feature to geojson
         features.append(feature)
 
@@ -239,7 +237,9 @@ def convert_tif_to_geojson(tif_path) -> List[dict]:
     # geopandas also automatically merges all polygons with same values
     gdf = geopandas.GeoDataFrame.from_features(features, crs="urn:ogc:def:crs:EPSG::25832",
                                                columns=["geometry", "value"])
+    gdf = gdf.dissolve(by="value")
     gdf = gdf.to_crs("EPSG:4326")
+
     reprojected_features_geojson = json.loads(gdf.to_json(na='null', show_bbox=False))  # features in geojson format
 
     return reprojected_features_geojson
