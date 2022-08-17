@@ -207,8 +207,10 @@ def get_grouptask(grouptask_id: str):
     print(f"getting result. Group task id {grouptask_id} , result_format {result_format}")
 
     group_result = GroupResult.restore(grouptask_id, app=celery_app)
+    total_results_count = len(group_result.results)
     results = [result.get() for result in group_result.results if result.ready()]
-
+    ready_results_count = len(results)
+    
     if results:
         # first summarize the results into 1 geojson
         results = summarize_multiple_geojsons_to_one([result["geojson"] for result in results])
@@ -230,9 +232,8 @@ def get_grouptask(grouptask_id: str):
     response = {
         'grouptaskId': group_result.id,
         'tasksCompleted': group_result.completed_count(),
-        'tasksTotal': len(group_result.results),
-        'grouptaskProcessed': group_result.ready(),
-        'grouptaskSucceeded': group_result.successful(),
+        'tasksTotal': total_results_count,
+        'grouptaskProcessed': total_results_count == ready_results_count,
         'results': results
     }
 
