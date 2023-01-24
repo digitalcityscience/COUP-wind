@@ -1,4 +1,10 @@
 #!/bin/bash
+# PLEASE SPECIFY YOUR AUTH TOKEN AND CITYPYO USER ID BELOW
 
-curl -X POST  http://localhost:5003/task -H 'Content-type: application/json' \
-    -d '{ "city_pyo_user": "", "wind_speed": 25, "wind_direction": 258, "result_format": "geojson", "custom_roi": [], "hash": "test_local_2", "city_pyo_user": "90af2ace6cb38ae1588547c6c20dcb36" }'
+curl --location --request POST 'http://localhost:5001/trigger_calculation' \
+--header 'Content-Type: application/json' \
+--header 'Authorization: Basic WU9VUl9JRDpZT1VSX1BBU1NXT1JE' \
+--data-raw '{
+   "wind_speed": 23, "wind_direction": 40, "result_format": "geojson",
+   "city_pyo_user": "10a1abf703145e1186b65293b8337680"
+}'

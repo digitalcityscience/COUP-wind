@@ -159,7 +159,7 @@ def trigger_calculation():
         abort(400)
     try:
         # are all relevant params delivered?
-        __wind_scenario = ScenarioParams(request.json, "wind")  # todo get wind from endpiont
+        __wind_scenario = ScenarioParams(request.json, "wind")
         city_pyo_user_id = request.json["city_pyo_user"]
     except KeyError as missing_arg:
         abort(400, "Bad Request. Missing argument: %s" % missing_arg)
@@ -183,7 +183,7 @@ def trigger_calculation():
 
                 abort(HTTPStatus.GATEWAY_TIMEOUT, (
                     f"Setup in process. This may take several minutes. \n"
-                    f"Check with GET .../tasks/{ setup_task.id } if setup is ready. \n"
+                    f"Check with GET .../check_on_singletask/{ setup_task.id } if setup is ready. \n"
                     f"Then repost your calculation request."
                     )    
                 )
@@ -221,6 +221,8 @@ def get_grouptask(grouptask_id: str):
     results = [result.get() for result in group_result.results if result.ready()]
 
     print(f"{len(results)} of { len(group_result.results) } tasks ready.")
+    print(results)
+    exit()
 
     if results:
         # first summarize the results into 1 geojson

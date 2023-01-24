@@ -1,13 +1,7 @@
-requests
 matplotlib
 schedule
 asyncio
-geopandas
 pyproj
-rasterio
 shapely
 numpy
 rioxarray
-pygeos
-flask
-flask_cors

@@ -6,7 +6,7 @@ import os
 # Redis config
 redis_host = os.getenv('REDIS_HOST', 'localhost')
 redis_port = os.getenv('REDIS_PORT', 6379)
-redis_pass = os.getenv('REDIS_PASS', 'G0rDkQtRcl!E')
+redis_pass = os.getenv('REDIS_PASS', 'YOUR_PASS')
 
 broker_url = 'redis://:{}@{}:{}/0'.format(
     redis_pass,

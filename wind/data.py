@@ -239,6 +239,7 @@ def convert_tif_to_geojson(tif_path) -> List[dict]:
                                                columns=["geometry", "value"])
     gdf = gdf.dissolve(by="value")
     gdf = gdf.to_crs("EPSG:4326")
+    print(gdf.head())
 
     reprojected_features_geojson = json.loads(gdf.to_json(na='null', show_bbox=False))  # features in geojson format
 

@@ -91,7 +91,7 @@ Results are obtained through a 3 step process:
 ### ENV Variables
       - REDIS_HOST=redis
       - REDIS_PORT=6379
-      - REDIS_PASS=G0rDkQtRcl!E
+      - REDIS_PASS=YOUR_PASS
       - INFRARED_URL=http://ait-mock-api:5555/
       - INFRARED_USERNAME=test
       - INFRARED_PASSWORD=test
