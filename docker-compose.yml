@@ -15,7 +15,7 @@ services:
     build:
       context: .
     ports:
-      - 5001:5003
+      - 5001:5001
     command: ["python", "entrypoint.py"]  # use entrypoint.sh for production  
     restart: "always"
     environment:
