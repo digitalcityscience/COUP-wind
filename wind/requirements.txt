@@ -1,7 +1,0 @@
-matplotlib
-schedule
-asyncio
-pyproj
-shapely
-numpy
-rioxarray

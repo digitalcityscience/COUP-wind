@@ -1,6 +1,6 @@
 from celery import signals, group, chain
 from celery.utils.log import get_task_logger
-from mycelery import app
+from celery_app import app
 from cache import Cache
 
 from services import get_cache_key_compute_task, get_cache_key_setup_task, is_valid_md5

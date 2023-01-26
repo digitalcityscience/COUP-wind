@@ -6,7 +6,7 @@ from flask_cors import CORS
 from flask_httpauth import HTTPBasicAuth
 from http import HTTPStatus
 
-from mycelery import app as celery_app
+from celery_app import app as celery_app
 from celery.result import AsyncResult, GroupResult
 
 import werkzeug

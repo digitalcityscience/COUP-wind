@@ -1,4 +1,5 @@
 amqp
+asyncio
 async-timeout
 billiard
 celery[redis]
@@ -30,6 +31,7 @@ rasterio
 redis
 requests
 rioxarray
+schedule
 scipy
 Shapely
 urllib3

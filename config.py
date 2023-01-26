@@ -18,7 +18,7 @@ broker_url = 'redis://:{}@{}:{}/0'.format(
 worker_concurrency = 10
 
 # Result config
-result_expires = '604800'  # Keep results for 1 week.
+result_expires = None  # never expire
 result_persistent = True
 result_backend = 'redis://:{}@{}:{}/1'.format(
     redis_pass,
