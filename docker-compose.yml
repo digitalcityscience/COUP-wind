@@ -25,7 +25,7 @@ services:
       - INFRARED_URL=http://ait-mock-api:5555/
       - INFRARED_USERNAME=test
       - INFRARED_PASSWORD=test
-      - CITY_PYO=http://192.168.1.193:5000/
+      - CITY_PYO=YOUR_CITY_PYO_URL
       - CLIENT_ID=YOUR_ID
       - CLIENT_PASSWORD=YOUR_PASSWORD
 
@@ -41,7 +41,7 @@ services:
       - INFRARED_URL=http://ait-mock-api:5555/
       - INFRARED_USERNAME=test
       - INFRARED_PASSWORD=test
-      - CITY_PYO=http://192.168.1.193:5000/
+      - CITY_PYO=YOUR_CITY_PYO_URL
 
   # run your own ait-mock-api for fast local debugging        
   ait-mock-api:
