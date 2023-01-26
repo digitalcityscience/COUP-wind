@@ -5,6 +5,6 @@ curl --location --request POST 'http://localhost:5001/trigger_calculation' \
 --header 'Content-Type: application/json' \
 --header 'Authorization: Basic WU9VUl9JRDpZT1VSX1BBU1NXT1JE' \
 --data-raw '{
-   "wind_speed": 23, "wind_direction": 40, "result_format": "geojson",
-   "city_pyo_user": "10a1abf703145e1186b65293b8337680"
+   "wind_speed": 19, "wind_direction": 24, "result_format": "geojson",
+   "city_pyo_user": "YOUR_CITY_PYO_USERID"
 }'
