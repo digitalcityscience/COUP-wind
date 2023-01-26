@@ -237,7 +237,8 @@ def convert_tif_to_geojson(tif_path) -> List[dict]:
     # geopandas also automatically merges all polygons with same values
     gdf = geopandas.GeoDataFrame.from_features(features, crs="urn:ogc:def:crs:EPSG::25832",
                                                columns=["geometry", "value"])
-    gdf = gdf.dissolve(by="value")
+    
+    gdf = gdf.dissolve(by="value").reset_index()
     gdf = gdf.to_crs("EPSG:4326")
 
     reprojected_features_geojson = json.loads(gdf.to_json(na='null', show_bbox=False))  # features in geojson format
@@ -277,6 +278,6 @@ def summarize_multiple_geojsons_to_one(geojson_array):
     )
     
     # dissolve polygons with the same value in the "value" column
-    results_gdf.dissolve(by='value')
+    results_gdf = results_gdf.dissolve(by='value').reset_index()
     
     return json.loads(results_gdf.to_json())
