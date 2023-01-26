@@ -159,7 +159,7 @@ def trigger_calculation():
         abort(400)
     try:
         # are all relevant params delivered?
-        __wind_scenario = ScenarioParams(request.json, "wind")
+        __wind_scenario = ScenarioParams(request.json, "wind")  # todo get wind from endpiont
         city_pyo_user_id = request.json["city_pyo_user"]
     except KeyError as missing_arg:
         abort(400, "Bad Request. Missing argument: %s" % missing_arg)
@@ -218,12 +218,12 @@ def get_grouptask(grouptask_id: str):
     print(f"Requested result of group task id {grouptask_id} , result_format {result_format}")
 
     group_result = GroupResult.restore(grouptask_id, app=celery_app)
+    total_results_count = len(group_result.results)
     results = [result.get() for result in group_result.results if result.ready()]
-
+    ready_results_count = len(results)
     print(f"{len(results)} of { len(group_result.results) } tasks ready.")
-    print(results)
-    exit()
 
+    
     if results:
         # first summarize the results into 1 geojson
         results = summarize_multiple_geojsons_to_one([result["geojson"] for result in results])
@@ -245,9 +245,8 @@ def get_grouptask(grouptask_id: str):
     response = {
         'grouptaskId': group_result.id,
         'tasksCompleted': group_result.completed_count(),
-        'tasksTotal': len(group_result.results),
-        'grouptaskProcessed': group_result.ready(),
-        'grouptaskSucceeded': group_result.successful(),
+        'tasksTotal': total_results_count,
+        'grouptaskProcessed': total_results_count == ready_results_count,
         'results': results
     }
 
