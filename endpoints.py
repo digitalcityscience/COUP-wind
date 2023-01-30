@@ -196,7 +196,7 @@ def trigger_calculation():
             abort(500, e)
 
     group_task_id = calc_task.get()  # use group task id to get results of the calc_task.
-    response = {'groupTaskId': group_task_id}
+    response = {'taskId': group_task_id}
     
     return make_response(
         jsonify(response),
