@@ -4,7 +4,7 @@ import re
 import time
 
 from celery.result import GroupResult
-from mycelery import app as celery_app
+from celery_app import app as celery_app
 from geojson_to_png import format_result_as_png
 
 

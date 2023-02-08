@@ -1,6 +1,6 @@
 from celery import signals, group, chain
 from celery.utils.log import get_task_logger
-from mycelery import app
+from celery_app import app
 from cache import Cache
 
 from services import get_cache_key_compute_task, get_cache_key_setup_task, is_valid_md5
@@ -84,12 +84,6 @@ def setup_infrared_projects_for_cityPyo_user(user_id: str) -> str:
 
     return group_result.id
 
-# trigger calculation for a infrared project
-@app.task()
-def trigger_calculation(wind_scenario, buildings, project):
-    return start_calculation_for_project(wind_scenario, buildings, project)
-
-
 # triggers a computation for each of the infrared_projects and returns them as group result
 @app.task()
 def compute_task(
@@ -119,6 +113,11 @@ def compute_task(
     group_result.save()
 
     return group_result.id
+
+# trigger calculation for a infrared project
+@app.task()
+def trigger_calculation(wind_scenario, buildings, project):
+    return start_calculation_for_project(wind_scenario, buildings, project)
 
 
 @signals.task_postrun.connect()

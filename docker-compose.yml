@@ -5,7 +5,7 @@ services:
     ports:
       - 6379:6379
     restart: "always"
-    command: redis-server --requirepass G0rDkQtRcl!E --appendonly yes
+    command: redis-server --requirepass YOUR_PASS --appendonly yes    
     volumes:
       - "./redis/data:/data"
     environment: 
@@ -15,16 +15,19 @@ services:
     build:
       context: .
     ports:
-      - 5004:5000
+      - 5001:5001
+    command: ["python", "entrypoint.py"]  # use entrypoint.sh for production  
     restart: "always"
     environment:
       - REDIS_HOST=redis
       - REDIS_PORT=6379
-      - REDIS_PASS=G0rDkQtRcl!E
+      - REDIS_PASS=YOUR_PASS
       - INFRARED_URL=http://ait-mock-api:5555/
       - INFRARED_USERNAME=test
       - INFRARED_PASSWORD=test
-      - CITY_PYO=https://api.hcu-dev.de/citypyo/
+      - CITY_PYO=YOUR_CITY_PYO_URL
+      - CLIENT_ID=YOUR_ID
+      - CLIENT_PASSWORD=YOUR_PASSWORD
 
   worker:
     build:
@@ -34,11 +37,11 @@ services:
     environment:
       - REDIS_HOST=redis
       - REDIS_PORT=6379
-      - REDIS_PASS=G0rDkQtRcl!E
+      - REDIS_PASS=YOUR_PASS
       - INFRARED_URL=http://ait-mock-api:5555/
       - INFRARED_USERNAME=test
       - INFRARED_PASSWORD=test
-      - CITY_PYO=https://api.hcu-dev.de/citypyo/
+      - CITY_PYO=YOUR_CITY_PYO_URL
 
   # run your own ait-mock-api for fast local debugging        
   ait-mock-api:
