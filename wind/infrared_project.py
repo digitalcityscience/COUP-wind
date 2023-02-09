@@ -267,11 +267,13 @@ class InfraredProject:
 
 
     def create_new_building(self, new_building):
-        new_bld_response = make_query(wind.queries.create_building_query(new_building, self.snapshot_uuid), self.user)
+        query = wind.queries.create_building_query(new_building, self.snapshot_uuid)
+        new_bld_response = make_query(query, self.user) 
         uuid = get_value(new_bld_response, ["data", "createNewBuilding", "uuid"])
 
         if not uuid:
-            print("could not create building!")
+            print(f"could not create building! {new_bld_response}", )
+            print(f"Query {query}")
             self.create_new_building(new_building)
 
 
