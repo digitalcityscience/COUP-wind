@@ -13,7 +13,7 @@ import werkzeug
 from werkzeug.security import generate_password_hash, check_password_hash
 
 
-from services import check_infrared_projects_still_exist, get_calculation_input, get_infrared_projects_from_group_task, convert_result_to_png
+from services import check_infrared_projects_still_exist_at_infrared, get_calculation_input, get_infrared_projects_from_group_task, convert_result_to_png
 from wind.data import summarize_multiple_geojsons_to_one
 from wind.wind_scenario_params import ScenarioParams
 import tasks
@@ -68,8 +68,9 @@ def bad_request(exception: werkzeug.exceptions.BadRequest):
     )
 
 
-# tries to find the calculation result in cache, otherwise returns None
-def find_calc_task_in_cache(request_json):
+# tries to find the calculation result in cache and returns its group task id
+# otherwise returns None
+def find_calc_task_in_cache(request_json) -> str:
     try:
         calc_task = tasks.get_result_from_cache.delay(*get_calculation_input(request_json, hashes_only=True))
     except Exception:
@@ -77,17 +78,19 @@ def find_calc_task_in_cache(request_json):
         return None
 
     print("found group task for calculation in cache. Task ID", calc_task.id)
-    # test if result can be restored        
+
     try:
         async_result = AsyncResult(calc_task.id, app=celery_app)
         group_result = GroupResult.restore(async_result.get(), app=celery_app)
+
+        # test if result can be restored
         result_array = [result.get() for result in group_result.results if result.ready()]
+
+        return group_result.id
+
     except Exception as e:
         print("But obtaining results from cache caused error.", e)
         return None
-
-    # return calc task
-    return calc_task
 
 
 # tries to find infrafred project setup in cache and, otherwise returns None
@@ -121,7 +124,7 @@ def check_projects_for_user():
     try:
         # retrieve infrared projects from cache
         infrared_projects = find_infrared_projects_in_cache(cityPyo_user)
-        if check_infrared_projects_still_exist(infrared_projects):
+        if check_infrared_projects_still_exist_at_infrared(infrared_projects):
             # projects still exist, nothing to do.
             return "success"
         else:
@@ -135,7 +138,7 @@ def check_projects_for_user():
     try:
         recreation_group_task = tasks.setup_infrared_projects_for_cityPyo_user.delay(user_id=cityPyo_user)
         infrared_projects = get_infrared_projects_from_group_task(recreation_group_task)
-        check_successful = check_infrared_projects_still_exist(infrared_projects)
+        check_successful = check_infrared_projects_still_exist_at_infrared(infrared_projects)
     except Exception as e:
         print("Failed for cityPyo user ", cityPyo_user)
         print("cannot check if projects exist. There might be a general error: ", e)
@@ -166,14 +169,21 @@ def trigger_calculation():
     except Exception as e:
         abort(400, "Bad Request. Exception: %s" % e)
 
-    # wind_scenario["result_type"] = "wind"  # TODO make route for sun, ...
+    # first try to find the task in cache and returns its group task id
+    group_task_id = find_calc_task_in_cache(request.json)
 
-    calc_task = find_calc_task_in_cache(request.json)
-    if not calc_task:
+    if group_task_id:
+        return make_response(
+            jsonify({'taskId': group_task_id}),
+            HTTPStatus.OK,
+        )
+
+    # if not in cache, start the calculation
+    else:
         try:
-            # check if projects are cached and still exist. Otherwise recreate them at endpoint.
+            # check if Infrared-projects are cached and still exist. Otherwise recreate them at endpoint.
             infrared_projects = find_infrared_projects_in_cache(city_pyo_user_id)
-            if not check_infrared_projects_still_exist(infrared_projects):
+            if not check_infrared_projects_still_exist_at_infrared(infrared_projects):
                 """
                 Trigger the recreation of projects at Infrared endpoint,
                 which takes several minutes.
@@ -192,16 +202,13 @@ def trigger_calculation():
             print("Sending calculation request to AIT Infrared.")
             calc_task = tasks.compute_task.delay(*get_calculation_input(request.json), infrared_projects)
 
+            return make_response(
+                jsonify({'taskId': calc_task.get()}),
+                HTTPStatus.OK,
+            )
+
         except Exception as e:
             abort(500, e)
-
-    group_task_id = calc_task.get()  # use group task id to get results of the calc_task.
-    response = {'taskId': group_task_id}
-    
-    return make_response(
-        jsonify(response),
-        HTTPStatus.OK,
-    )
 
 
 # route to collect results

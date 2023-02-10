@@ -34,7 +34,7 @@ def get_infrared_projects_from_group_task(group_task) -> list:
     return infrared_projects
 
 
-def check_infrared_projects_still_exist(infrared_projects) -> bool:
+def check_infrared_projects_still_exist_at_infrared(infrared_projects) -> bool:
     if not infrared_projects:
         # make sure to check valid list
         return False
