@@ -264,6 +264,29 @@ def get_grouptask(grouptask_id: str):
 
 
 
+# route to collect results
+@app.route("/collect_results/<grouptask_id>/status", methods=['GET'])
+@auth.login_required
+def get_grouptask(grouptask_id: str):
+    """
+    Route to get status of group tasks.
+    """
+    print(f"Requested status of group task id {grouptask_id}")
+
+    group_result = GroupResult.restore(grouptask_id, app=celery_app)
+    
+    response = {
+        'status': group_result.state,
+        'tasksCompleted': group_result.completed_count(),
+        'tasksTotal': len(group_result.results),
+    }
+
+    return make_response(
+        response,
+        HTTPStatus.OK,
+    )
+
+
 @app.route("/check_on_singletask/<task_id>", methods=['GET'])
 @auth.login_required
 def get_task(task_id: str):
