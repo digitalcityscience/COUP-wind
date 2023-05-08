@@ -2,6 +2,7 @@
 # Created by https://www.toptal.com/developers/gitignore/api/python,venv,macos,vim,pycharm
 # Edit at https://www.toptal.com/developers/gitignore?templates=python,venv,macos,vim,pycharm
 
+
 ### macOS ###
 # General
 .DS_Store
@@ -257,7 +258,7 @@ celerybeat.pid
 *.sage.py
 
 # Environments
-.env
+.env*
 .venv
 env/
 venv/
