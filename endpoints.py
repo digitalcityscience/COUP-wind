@@ -274,9 +274,15 @@ def get_grouptask_status(grouptask_id: str):
     print(f"Requested status of group task id {grouptask_id}")
 
     group_result = GroupResult.restore(grouptask_id, app=celery_app)
+
+    status = "PENDING"
+    if group_result.successful():
+        status = "SUCCESS"
+    if group_result.failed():
+        status = "FAILURE"
     
     response = {
-        'status': group_result.state,
+        'status': status,
         'tasksCompleted': group_result.completed_count(),
         'tasksTotal': len(group_result.results),
     }
