@@ -267,7 +267,7 @@ def get_grouptask(grouptask_id: str):
 # route to collect results
 @app.route("/collect_results/<grouptask_id>/status", methods=['GET'])
 @auth.login_required
-def get_grouptask(grouptask_id: str):
+def get_grouptask_status(grouptask_id: str):
     """
     Route to get status of group tasks.
     """
