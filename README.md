@@ -1,5 +1,15 @@
-# Wind Module
-A module that will accept requests to calculate wind-comfort for a CityPyO user. 
+# Wind AND SUN Modules
+Both Wind and sun are provided from AIT infrared.
+This is a glue-code repository to communicate with their endpoint.
+You need a CityPyO user at DCS to use this repo.
+
+## SUN 
+To run a sun simulaiton post a request to /trigger_calculation_sun
+payload as a json should contain only your CityPyO user id.
+{ city_pyo_user	"YOUR_ID" }
+(It is used to get the building geometries from CityPyO)
+## WIND
+Requests to calculate wind-comfort for a CityPyO user. 
 Inputs are: 
 - Wind speed
 - Wind Direction
@@ -24,13 +34,35 @@ The returned normalised values represent categories as seen in the following tab
 | `0.8` | "Uncomfortable"          |
 | `1.0` | "Dangerous"              |
 
+
+#### SUNLIGHT HOURS RESULTS
+| value | sunlight hours average   |
+| ----- | ------------------------ |
+| `0.0` | "< 1.2 h/day"            |
+| `0.1` | "2.4 h/day"              |
+| `0.2` | "3.6 h/day"              |
+| `0.3` | "4.8 h/day"              |
+| `0.4` | "6 h/day"                |
+| ....
+| `1.0` | "12 h/day "              |
+
+
+
 ## USAGE
 Results are obtained through a 3 step process:
-- **Trigger a calculation**: POST Request to /trigger_calculation 
+- **Trigger a calculation wind**: POST Request to /trigger_calculation 
     - Params: 
         ```
         - "wind_speed": INT ; [km/h] ;
         - "wind_direction": INT [0-360°] (0 being north, 90 east); 
+        - "city_pyo_user": YOUR_CITYPYO_USER_ID  
+        ```
+    - Returns the task id of the celery task:
+        ```json { "taskId": __TASK_ID__ } ```
+        
+- **Trigger a calculation sun**: POST Request to /trigger_calculation_sun
+    - Params: 
+        ```
         - "city_pyo_user": YOUR_CITYPYO_USER_ID  
         ```
     - Returns the task id of the celery task:
