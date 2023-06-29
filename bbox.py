@@ -6,8 +6,6 @@ import matplotlib.pyplot as plt
 
 if __name__ == "__main__":
 
-    print("hello")
-
     area_gdf = geopandas.read_file("wind/project_area_utm.geojson")
     area_pol = list(area_gdf.geometry)[0]
 

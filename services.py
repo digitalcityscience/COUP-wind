@@ -9,7 +9,6 @@ from geojson_to_png import format_result_as_png
 
 
 import wind.cityPyo as cp
-from wind.wind_scenario_params import ScenarioParams
 from wind.infrared_user import InfraredUser
 
 cityPyo = cp.CityPyo() ## put cityPyo container here
@@ -53,21 +52,8 @@ def check_infrared_projects_still_exist_at_infrared(infrared_projects) -> bool:
     
     return True
 
-
-def get_calculation_input(complex_task, hashes_only=False):
-    # hash noise scenario settings
-    wind_params = ScenarioParams(complex_task, "wind")  # TODO get "wind" from endpoint!
-    scenario = wind_params.export_to_json()
-    scenario_hash = hash_dict(scenario)
-
-    # hash buildings geojson
-    buildings = get_buildings_geojson_from_cityPyo(complex_task["city_pyo_user"])
-    buildings_hash = hash_dict(buildings)
-
-    if hashes_only:
-        return scenario_hash, buildings_hash
-
-    return scenario_hash, buildings_hash, scenario, buildings
+    # every value needs to be hashable (dict, str , array, ..) for celery to work
+    return calc_input_hash, buildings_hash, calc_input.export_to_json()
 
 
 def get_buildings_geojson_from_cityPyo(cityPyo_user_id):
@@ -79,17 +65,20 @@ def hash_dict(dict_to_hash):
     hash_buildings = hashlib.md5(dict_string.encode())
 
     return hash_buildings.hexdigest()
+def get_cache_key_compute_task(sim_type:str, buildings_hash:str, calc_settings_hash:str):
+    return sim_type + "_" + buildings_hash + "_" +  calc_settings_hash
 
+def get_cache_key_setup_task(**kwargs):
+    return "infrared_projects" + "_" + kwargs["city_pyo_user"]
+
+
+
+""" 
 def is_valid_md5(checkme):
     if type(checkme) == str:
         if re.findall(r"([a-fA-F\d]{32})", checkme):
             return True
 
     return False
-
-def get_cache_key_compute_task(**kwargs):
-    return kwargs["scenario_hash"] + "_" + kwargs["buildings_hash"]
-
-def get_cache_key_setup_task(**kwargs):
-    return "infrared_projects" + "_" + kwargs["city_pyo_user"]
+ """
 

@@ -191,6 +191,24 @@ def query():
                     }
                 }
             }
+        
+        if "runServiceSolarRadiation" in query:
+            return {
+                "data": {
+                    "runServiceSolarRadiation": {
+                        "uuid": get_random_uuid_id()
+                    }
+                }
+            }
+        
+        if "runServiceSunlightHours" in query:
+                    return {
+                        "data": {
+                            "runServiceSunlightHours": {
+                                "uuid": get_random_uuid_id()
+                            }
+                        }
+                    }
 
 
     if "query" in query:

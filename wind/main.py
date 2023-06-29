@@ -2,7 +2,6 @@ from attr.setters import convert
 from shapely.geometry import Polygon
 
 from wind.cityPyo import CityPyo
-from wind.wind_scenario_params import ScenarioParams
 from wind.data import convert_tif_to_geojson, init_bbox_matrix_for_project_area, get_buildings_for_bbox, init_bbox_matrix_for_project_area, make_gdf_from_geojson
 from wind.infrared_user import InfraredUser
 from wind.infrared_project import InfraredProject
@@ -36,19 +35,6 @@ cityPyo = CityPyo()   # TODO externalize collection of buildings!
 #         print("recreating infrared user. ")
 #         del infrared_user
 #         infrared_user = init_infrared_user()
-
-
-   
-# updates an infrared project with all relevant information for scenario (buildings, wind_direction, wind_speed)
-def update_buildings_for_infrared_project(infrared_project: InfraredProject, cityPyo_buildings):
-    # update buildings for each infrared project instance
-    buildings_gdf = make_gdf_from_geojson(cityPyo_buildings)
-    if buildings_gdf.crs != "EPSG:25832":
-        buildings_gdf = buildings_gdf.to_crs("EPSG:25832")
-
-    buildings_for_project = get_buildings_for_bbox(infrared_project.buffered_bbox_utm, buildings_gdf)
-
-    infrared_project.update_buildings(buildings_for_project)
 
 
 def create_infrared_user_from_json(infrared_user_json):
@@ -113,15 +99,13 @@ def create_infrared_project_for_bbox_and_user(infrared_user_json: dict, user_id:
     return infrared_project.export_to_json()
 
 
-# trigger calculation at AIT endpoint for a infrared_project with given scenario settings and buildings [geojson]
-def start_calculation_for_project(scenario: dict, buildings: dict, infrared_project_json: dict):
+# trigger calculation at AIT infrared endpoint for a infrared_project with given scenario settings and buildings [geojson]
+def start_calculation_for_project(sim_type:str, calc_settings: dict, infrared_project_json: dict):
+    # update buildings at the AIT infrared endpoint
     infrared_project = recreate_infrared_project_from_json(infrared_project_json, update_buildings=True)
     
-    print("scenario", scenario)
-    print("building_count", infrared_project.building_count)
-    scenario = ScenarioParams(scenario)
-    
-    return infrared_project.trigger_calculation_at_endpoint_for(scenario)
+    # then trigger calculation
+    return infrared_project.trigger_calculation_at_endpoint_for(sim_type, calc_settings)
 
 
 # collects the result of a triggered calculation

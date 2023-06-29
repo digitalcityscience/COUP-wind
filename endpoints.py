@@ -13,9 +13,8 @@ import werkzeug
 from werkzeug.security import generate_password_hash, check_password_hash
 
 
-from services import check_infrared_projects_still_exist_at_infrared, get_calculation_input, get_infrared_projects_from_group_task, convert_result_to_png
+from services import check_infrared_projects_still_exist_at_infrared, get_buildings_geojson_from_cityPyo, get_infrared_projects_from_group_task, convert_result_to_png, hash_dict
 from wind.data import summarize_multiple_geojsons_to_one
-from wind.wind_scenario_params import ScenarioParams
 import tasks
 
 
@@ -70,9 +69,10 @@ def bad_request(exception: werkzeug.exceptions.BadRequest):
 
 # tries to find the calculation result in cache and returns its group task id
 # otherwise returns None
-def find_calc_task_in_cache(request_json) -> str:
+def find_calc_task_in_cache(sim_type:str, buildings_hash: str, calc_settings_hash:str) -> str:
     try:
-        calc_task = tasks.get_result_from_cache.delay(*get_calculation_input(request_json, hashes_only=True))
+
+        calc_task = tasks.get_result_from_cache.delay(sim_type, buildings_hash, calc_settings_hash)
     except Exception:
         print("Result not yet in cache")
         return None
@@ -84,7 +84,7 @@ def find_calc_task_in_cache(request_json) -> str:
         group_result = GroupResult.restore(async_result.get(), app=celery_app)
 
         # test if result can be restored
-        result_array = [result.get() for result in group_result.results if result.ready()]
+        _result_array = [result.get() for result in group_result.results if result.ready()]
 
         return group_result.id
 
@@ -153,24 +153,63 @@ def check_projects_for_user():
     if check_successful:
         return "success"
 
+# starts a wind or sun calculation
+def start_calculation(sim_type:str, city_pyo_user_id: str, calc_settings:dict, buildings_hash:str):
+ # check if Infrared-projects are cached and still exist. Otherwise recreate them at endpoint.
+    infrared_projects = find_infrared_projects_in_cache(city_pyo_user_id)
+    print("found infrared projects in cache", infrared_projects)
+    if not check_infrared_projects_still_exist_at_infrared(infrared_projects):
+        """
+        Trigger the recreation of projects at Infrared endpoint,
+        which takes several minutes.
+        Ask the user to try again in 5 min.
+        """
+        print("setting up projects at infrared endpoint")
+        setup_task = tasks.setup_infrared_projects_for_cityPyo_user.delay(city_pyo_user_id)
+        print(setup_task)
 
-@app.post("/trigger_calculation")
+
+        abort(HTTPStatus.GATEWAY_TIMEOUT, (
+            f"Setup in process. This may take several minutes. \n"
+            f"Check with GET .../check_on_singletask/{ setup_task.id } if setup is ready. \n"
+            f"Then repost your calculation request."
+            )    
+        )
+  
+    # compute result
+    calc_task = tasks.compute_task.delay(
+        sim_type=sim_type,
+        infrared_projects=infrared_projects,
+        calc_settings=calc_settings,
+        buildings_hash=buildings_hash
+    )
+
+    return calc_task
+
+
+# sun
+@app.post("/trigger_calculation_sun")
 @auth.login_required
-def trigger_calculation():
+def trigger_calculation_sun():
     # Validate request
     if not request.json:
         abort(400)
     try:
         # are all relevant params delivered?
-        __wind_scenario = ScenarioParams(request.json, "wind")  # todo get wind from endpiont
         city_pyo_user_id = request.json["city_pyo_user"]
     except KeyError as missing_arg:
         abort(400, "Bad Request. Missing argument: %s" % missing_arg)
     except Exception as e:
         abort(400, "Bad Request. Exception: %s" % e)
-
+    
+    # CityPyo user id is not part of calculation settings. It is only used to retrieve the building information.
+    # Several citypyo users might have the same buildings - or ids might change. However this is not relevant for the calculation.
+    calc_settings = request.json.copy()
+    del calc_settings["city_pyo_user"]
+    
     # first try to find the task in cache and returns its group task id
-    group_task_id = find_calc_task_in_cache(request.json)
+    buildings_hash = hash_dict(get_buildings_geojson_from_cityPyo(city_pyo_user_id)) # for caching only
+    group_task_id = find_calc_task_in_cache("sun", buildings_hash, hash_dict(calc_settings))
 
     if group_task_id:
         return make_response(
@@ -179,36 +218,78 @@ def trigger_calculation():
         )
 
     # if not in cache, start the calculation
-    else:
-        try:
-            # check if Infrared-projects are cached and still exist. Otherwise recreate them at endpoint.
-            infrared_projects = find_infrared_projects_in_cache(city_pyo_user_id)
-            if not check_infrared_projects_still_exist_at_infrared(infrared_projects):
-                """
-                Trigger the recreation of projects at Infrared endpoint,
-                which takes several minutes.
-                Ask the user to try again in 5 min.
-                """
-                setup_task = tasks.setup_infrared_projects_for_cityPyo_user.delay(city_pyo_user_id)
+    try:
+        # CityPyo user id is not part of calculation settings. It is only used to retrieve the building information.
+        # Several citypyo users might have the same buildings - or ids might change. However this is not relevant for the calculation.
+        calc_settings = request.json.copy()
+        del calc_settings["city_pyo_user"]
+        
+        calc_task = start_calculation(
+            sim_type="sun",
+            city_pyo_user_id=city_pyo_user_id,
+            calc_settings=calc_settings,
+            buildings_hash=buildings_hash
+        )
+        
+        return make_response(
+            jsonify({'taskId': calc_task.get()}),
+            HTTPStatus.OK,
+        )
 
-                abort(HTTPStatus.GATEWAY_TIMEOUT, (
-                    f"Setup in process. This may take several minutes. \n"
-                    f"Check with GET .../check_on_singletask/{ setup_task.id } if setup is ready. \n"
-                    f"Then repost your calculation request."
-                    )    
-                )
+    except Exception as e:
+        abort(500, e)
 
-            # compute result
-            print("Sending calculation request to AIT Infrared.")
-            calc_task = tasks.compute_task.delay(*get_calculation_input(request.json), infrared_projects)
 
-            return make_response(
-                jsonify({'taskId': calc_task.get()}),
-                HTTPStatus.OK,
-            )
+# wind
+@app.post("/trigger_calculation")
+@auth.login_required
+def trigger_calculation_wind():
+    print("triggering wind calculation")
+    # Validate request
+    if not request.json:
+        abort(400)
+    try:
+        # are all relevant params delivered?
+        city_pyo_user_id = request.json["city_pyo_user"]
+        __wind_direction = request.json["wind_direction"]
+        __wind_speed = request.json["wind_speed"]
+    except KeyError as missing_arg:
+        abort(400, "Bad Request. Missing argument: %s" % missing_arg)
+    except Exception as e:
+        abort(400, "Bad Request. Exception: %s" % e)
 
-        except Exception as e:
-            abort(500, e)
+    # CityPyo user id is not part of calculation settings. It is only used to retrieve the building information.
+    # Several citypyo users might have the same buildings - or ids might change. However this is not relevant for the calculation.
+    calc_settings = request.json.copy()
+    del calc_settings["city_pyo_user"]
+
+    # first try to find the task in cache and returns its group task id
+    buildings_hash = hash_dict(get_buildings_geojson_from_cityPyo(city_pyo_user_id)) # for caching only
+    group_task_id = find_calc_task_in_cache("wind", buildings_hash, hash_dict(calc_settings))
+
+    if group_task_id:
+        return make_response(
+            jsonify({'taskId': group_task_id}),
+            HTTPStatus.OK,
+        )
+
+    # if not in cache, start the calculation
+    try:
+        print("starting wind calculation")
+        calc_task = start_calculation(
+            sim_type="wind",
+            city_pyo_user_id=city_pyo_user_id,
+            calc_settings=calc_settings,
+            buildings_hash=buildings_hash
+        )
+
+        return make_response(
+            jsonify({'taskId': calc_task.get()}),
+            HTTPStatus.OK,
+        )
+
+    except Exception as e:
+        abort(500, e)
 
 
 # route to collect results
