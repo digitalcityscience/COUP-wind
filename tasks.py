@@ -3,7 +3,7 @@ from celery.utils.log import get_task_logger
 from celery_app import app
 from cache import Cache
 
-from services import get_cache_key_compute_task, get_cache_key_setup_task, is_valid_md5
+from services import get_cache_key_compute_task, get_cache_key_setup_task, hash_dict
 
 from wind.infrared_user import InfraredUser
 from wind.main import \
@@ -19,16 +19,16 @@ cache = Cache()
 
 @app.task()
 def get_result_from_cache(
-    scenario_hash: str,
-    buildings_hash: str
+    sim_type: str,
+    buildings_hash: str,
+    calc_input_hash: str
 ):
     # Check cache. If cached, return result from cache.
-    key = get_cache_key_compute_task(scenario_hash=scenario_hash, buildings_hash=buildings_hash)
+    key = get_cache_key_compute_task(sim_type, buildings_hash, calc_input_hash)
     result = cache.retrieve(key=key)
     if not result == {}:
         return result
     else: 
-        print("could not find result in cache!!")
         raise Exception("Could not find result in cache")
 
 
@@ -36,6 +36,7 @@ def get_result_from_cache(
 def get_project_setup_from_cache(user_id):
     # Check cache. If cached, return result from cache.     
     key = get_cache_key_setup_task(city_pyo_user=user_id)
+    print(key)
     group_result_id = cache.retrieve(key=key)
     
     if not group_result_id == {}:
@@ -87,25 +88,20 @@ def setup_infrared_projects_for_cityPyo_user(user_id: str) -> str:
 # triggers a computation for each of the infrared_projects and returns them as group result
 @app.task()
 def compute_task(
-    scenario_hash: str,
-    buildings_hash: str,
-    scenario: dict,
-    buildings: dict,
+    sim_type: str,
     infrared_projects: list,
+    calc_settings: dict,
+    buildings_hash: str # just for caching
     ):
-
-    print(
-        "computing task. Result will be hashed with this key ",
-        get_cache_key_compute_task(scenario_hash=scenario_hash, buildings_hash=buildings_hash))
-    
     # trigger calculation and collect result for project in infrared_projects
     task_group = group(
         [
+            # create task chain for each project. tasks in chain will be executed sequentially
             chain(
-                trigger_calculation.s(scenario, buildings, project), # returns result_uuid
-                collect_infrared_result.s(project) # collect_result will result_uuid as first argument
-                ) 
-            for project in sorted(infrared_projects, key=lambda d: d['building_count'], reverse=True) # sort projects by building count
+                trigger_calculation.s(sim_type, calc_settings, project), # returns result_uuid
+                collect_infrared_result.s(project) # collect_result will have result_uuid as first argument
+                )
+            for project in sorted(infrared_projects, key=lambda d: d['building_count'], reverse=True) # sort projects by building count (relevant results first)
         ]
     )
     
@@ -116,8 +112,8 @@ def compute_task(
 
 # trigger calculation for a infrared project
 @app.task()
-def trigger_calculation(wind_scenario, buildings, project):
-    return start_calculation_for_project(wind_scenario, buildings, project)
+def trigger_calculation(sim_type, calc_settings, project):
+    return start_calculation_for_project(sim_type, calc_settings, project)
 
 
 @signals.task_postrun.connect()
@@ -157,14 +153,13 @@ def task_postrun_handler(task_id, task, sender=None, *args, **kwargs):
         # Cache only succeeded tasks
         if state == "SUCCESS":
             try:
-               scenario_hash=func_args[0]
-               buildings_hash=func_args[1]
+                sim_type = func_kwargs["sim_type"]
+                buildings_hash = func_kwargs["buildings_hash"]
+                calc_settings = func_kwargs["calc_settings"]
             except:
-                # args gets provided as kwarg, when function is called by another task.
-                scenario_hash= func_kwargs["scenario_hash"]
-                buildings_hash=func_kwargs["buildings_hash"]
+                print("failed recover arguments from compute_task when caching. not caching result.")
+                return
 
-            if is_valid_md5(scenario_hash) and is_valid_md5(buildings_hash):
-                key = get_cache_key_compute_task(scenario_hash=scenario_hash, buildings_hash=buildings_hash)
-                cache.save(key=key, value=result)
-                print("cached result with key %s" % key)
+            key = get_cache_key_compute_task(sim_type, buildings_hash, hash_dict(calc_settings))
+            cache.save(key=key, value=result)
+            print("cached result with key %s" % key)

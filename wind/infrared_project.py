@@ -75,6 +75,7 @@ class InfraredProject:
     
     # for now every calcuation request creates a new infrared project, as calculation bbox is set on project level
     def create_new_project(self):
+        print("creating new project")
         self.delete_existing_project_with_same_name()
         
         # create new project
@@ -279,33 +280,38 @@ class InfraredProject:
 
     """ Project Result Handling"""
 
-    def trigger_calculation_at_endpoint_for(self, scenario):
+    def trigger_calculation_at_endpoint_for(self, sim_type, calc_settings):
 
         query = None
 
-        if scenario.result_type == "wind":
-            query = wind.queries.run_cfd_service_query(scenario.wind_direction, scenario.wind_speed, self.snapshot_uuid)
+        if sim_type == "wind":
+            query = wind.queries.run_cfd_service_query(calc_settings["wind_direction"], calc_settings["wind_speed"], self.snapshot_uuid)
             service_command = 'runServiceWindComfort'
 
-        if scenario.result_type == "solar":
+        elif sim_type == "solar":
             query = wind.queries.run_solar_rad_service_query(self.snapshot_uuid)
             service_command = 'runServiceSolarRadiation'
 
-        if scenario.result_type == "sunlight":
+        elif sim_type == "sun":
             query = wind.queries.run_sunlight_hours_service_query(self.snapshot_uuid)
             service_command = 'runServiceSunlightHours'
+        
+        else:
+            raise NotImplementedError(f"unknown simulation type {sim_type}")
 
         # make query to trigger result calculation on endpoint
         try:
             res = make_query(query, self.user)
             result_uuid = get_value(res, ['data', service_command, 'uuid'])
-            cityPyo.log_calculation_request(scenario.result_type, result_uuid)
+            cityPyo.log_calculation_request(sim_type, result_uuid)
             
             return result_uuid
 
         except Exception as exception:
-            print("calculation for ", scenario, " FAILS")
-            print(exception)
+            print(f"calculation for {sim_type} FAILS !" )
+            if sim_type == "wind":
+                print("with input" + str(calc_settings))
+            print(f"Exception: {exception}")
 
 
     # waits for the result to be avaible. Then crops it to the area of interest.
