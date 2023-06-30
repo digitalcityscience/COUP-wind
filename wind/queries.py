@@ -153,6 +153,26 @@ def create_building_query(building, snapshot_uuid):
 # TODO: run this before ?
 #mutation {    modifyProject (      uuid: "2eced4cb-978f-47d0-b90d-512ef1748354"      sessionSettings: "{\"mode\":\"context\",\"analysis\":[{\"name\":\"Wind Comfort\",\"parameters\":[{\"name\":\"Wind Speed\",\"id\":\"windSpeed\",\"tag\":\"slider\",\"value\":\"20\"},{\"name\":\"Wind Direction\",\"id\":\"windDirection\",\"tag\":\"slider\",\"value\":\"0\"}]}]}"      userUuid:"28ac653e-b9f6-4ebf-a0e1-a152e4e37f24"    ) {      success    }  }
 #mutation {\n runServiceWindComfort(\n snapshotUuid: \"91b16cd6-b1f9-4dc3-9722-2f8ddbcca083\"\n analysisName: \"Wind Comfort (0)\"\n windDirection: 90\n windSpeed: 20\n ) {\n success\n uuid\n } \n }"
+
+
+def activate_sun_service_query(user_uuid, project_uuid):
+    template = Template("""
+    mutation {    
+      modifyProject (
+        uuid: "$project_uuid"
+        sessionSettings: {"mode":"context","analysis":[{"name":"Sunlight Hours","version":0,"parameters":[],"uuid":null,"index":"0"}]}"
+        userUuid:"$user_uuid"
+      ) {
+        success
+        }
+      }
+    """)
+
+    return template.safe_substitute({
+        "snapshot_uuid": project_uuid,
+        "user_uuid": user_uuid
+    })
+
 def run_cfd_service_query(wind_direction, wind_speed, snapshot_uuid):
     template = Template("""
         mutation {
