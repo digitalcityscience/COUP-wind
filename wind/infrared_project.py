@@ -66,6 +66,7 @@ class InfraredProject:
             self.create_new_project()
             self.get_root_snapshot_id()
             self.delete_osm_geometries()
+            self.activate_sunlight_hours_calc_service()
         
         # udpate the buildings at the endpoint
         if update_buildings_at_endpoint: 
@@ -113,6 +114,11 @@ class InfraredProject:
                 successfully_del = delete_response['data']['deleteProject']['success']
                 print("success deleting %s" % successfully_del)
 
+
+    def activate_sunlight_hours_calc_service(self):
+        query = wind.queries.activate_sun_service_query(self.user.uuid, self.project_uuid)
+        response = make_query(query, self.user)
+        print("activate sunlight hours calc service", response)
 
     # exports project to json , so it can be serialized
     def export_to_json(self):
