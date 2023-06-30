@@ -199,7 +199,7 @@ def run_sunlight_hours_service_query(snapshot_uuid):
         mutation {
           runServiceSunlightHours (
             snapshotUuid: "$snapshot_uuid"
-            analysisName: "Sunlight Hours 1"
+            analysisName: "Sunlight Hours (0)"
           ) {
             success
             uuid
