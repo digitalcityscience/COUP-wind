@@ -210,6 +210,11 @@ def query():
                         }
                     }
 
+        if "modifyProject" in query:
+            return {
+                "data":{"modifyProject":{"success":True}}
+            }
+
 
     if "query" in query:
 
