@@ -169,7 +169,7 @@ def activate_sun_service_query(user_uuid, project_uuid):
     """)
 
     return template.safe_substitute({
-        "snapshot_uuid": project_uuid,
+        "project_uuid": project_uuid,
         "user_uuid": user_uuid
     })
 
