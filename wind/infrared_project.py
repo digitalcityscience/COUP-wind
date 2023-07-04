@@ -66,7 +66,7 @@ class InfraredProject:
             self.create_new_project()
             self.get_root_snapshot_id()
             self.delete_osm_geometries()
-            self.activate_sunlight_hours_calc_service()
+            # self.activate_sunlight_hours_calc_service() # fails in production. hotfix.
         
         # udpate the buildings at the endpoint
         if update_buildings_at_endpoint: 
