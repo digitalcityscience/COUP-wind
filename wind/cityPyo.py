@@ -4,6 +4,11 @@ import warnings
 
 import requests
 import os
+import json
+
+import geopandas as gpd
+from shapely import wkb
+
 
 cwd = os.getcwd()
 
@@ -21,9 +26,20 @@ class CityPyo:
     def get_buildings_for_user(self, user_id):
         try:
             # prioritize a buildings.json
-            return self.get_layer_for_user(user_id, "buildings")
+            buildings_json = self.get_layer_for_user(user_id, "buildings")
         except:
-            return self.get_layer_for_user(user_id, "upperfloor")
+            buildings_json = self.get_layer_for_user(user_id, "upperfloor")
+        
+        # DROP Z VALUES IN GEOMETRY IF EXISTS
+        df = gpd.GeoDataFrame.from_features(buildings_json["features"])
+
+        def _drop_z(geom):
+            return wkb.loads(wkb.dumps(geom, output_dimension=2))
+
+        df.geometry = df.geometry.transform(_drop_z)
+
+        return json.loads(df.to_json())
+
 
     def get_layer_for_user(self, user_id, layer_name, recursive_iteration=0):
         data = {
