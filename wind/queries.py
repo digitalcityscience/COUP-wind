@@ -156,22 +156,25 @@ def create_building_query(building, snapshot_uuid):
 
 
 def activate_sun_service_query(user_uuid, project_uuid):
-    template = Template("""
-    mutation {    
-      modifyProject (
-        uuid: "$project_uuid"
-        sessionSettings: {"mode":"context","analysis":[{"name":"Sunlight Hours","version":0,"parameters":[],"uuid":null,"index":"0"}]}"
-        userUuid:"$user_uuid"
-      ) {
-        success
-        }
-      }
-    """)
+        # copied from infrared
+        # 'mutation {\n    modifyProject (\n      uuid: ".....SECRET..."\n      sessionSettings: "{\\"mode\\":\\"context\\",\\"analysis\\":[{\\"name\\":\\"Sunlight Hours\\",\\"version\\":0,\\"parameters\\":[],\\"uuid\\":null,\\"index\\":\\"0\\"}]}"\n      userUuid:"...SECRET....."\n    ) {\n      success\n    }\n  }\n  '
 
-    return template.safe_substitute({
-        "project_uuid": project_uuid,
-        "user_uuid": user_uuid
-    })
+        template = Template("""mutation {    
+          modifyProject (
+            uuid: "$project_uuid"
+            sessionSettings: "{\\"mode\\":\\"context\\",\\"analysis\\":[{\\"name\\":\\"Sunlight Hours\\",\\"version\\":0,\\"parameters\\":[],\\"uuid\\":null,\\"index\\":\\"0\\"}]}"
+            userUuid:"$user_uuid"
+          ) {
+            success
+            }
+          }
+        """)
+
+        return template.safe_substitute({
+            "project_uuid": project_uuid,
+            "user_uuid": user_uuid
+        })
+
 
 def run_cfd_service_query(wind_direction, wind_speed, snapshot_uuid):
     template = Template("""

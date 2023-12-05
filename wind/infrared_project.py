@@ -114,9 +114,10 @@ class InfraredProject:
                 successfully_del = delete_response['data']['deleteProject']['success']
                 print("success deleting %s" % successfully_del)
 
-
     def activate_sunlight_hours_calc_service(self):
-        query = wind.queries.activate_sun_service_query(self.user.uuid, self.project_uuid)
+        query = wind.queries.activate_sun_service_query(
+            self.user.uuid, self.project_uuid
+        )
         response = make_query(query, self.user)
         print("activate sunlight hours calc service", response)
 
@@ -299,6 +300,7 @@ class InfraredProject:
             service_command = 'runServiceSolarRadiation'
 
         elif sim_type == "sun":
+            self.activate_sunlight_hours_calc_service()
             query = wind.queries.run_sunlight_hours_service_query(self.snapshot_uuid)
             service_command = 'runServiceSunlightHours'
         
